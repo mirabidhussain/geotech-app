@@ -82,7 +82,7 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
 </div>
 <input type="file" id="fOpen" accept=".json,application/json,text/plain,*/*" hidden>
 <nav class="tabs" id="tabs">
-  <button data-t="site" class="on">Site</button><button data-t="tests">Lab tests</button><button data-t="footing">Footing</button><button data-t="bulb">Pressure bulb</button><button data-t="plate">Plate test</button><button data-t="report">Report</button>
+  <button data-t="site" class="on">Site</button><button data-t="tests">Lab tests</button><button data-t="footing">Footing</button><button data-t="bulb">Pressure bulb</button><button data-t="piles">Piles</button><button data-t="plate">Plate test</button><button data-t="report">Report</button>
 </nav>
 <main>
 <section id="site" class="on">
@@ -182,6 +182,44 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
   </div>
 </section>
 
+<section id="piles">
+  <div class="chips" id="pkChips"></div>
+  <div class="card">
+    <h3>Bored cast-in-situ pile — IS 2911 (Part 1/Sec 2)</h3>
+    <div class="row"><label class="f"><span>Name</span><input id="kName"></label><label class="f"><span>Borehole</span><select id="kBh"></select></label></div>
+    <div class="row3">
+      <label class="f"><span>Diameter D (m)</span><input id="kD" type="number" step="0.05"></label>
+      <label class="f"><span>Length below cut-off L (m)</span><input id="kL" type="number" step="0.5"></label>
+      <label class="f"><span>Cut-off depth (m)</span><input id="kDf" type="number" step="0.1"></label>
+    </div>
+    <div class="row3">
+      <label class="f"><span>Load per pile (kN)</span><input id="kP" type="number"></label>
+      <label class="f"><span>Lateral load H (kN)</span><input id="kH" type="number"></label>
+      <label class="f"><span>Moment at head (kN·m)</span><input id="kM" type="number"></label>
+    </div>
+    <div class="row3">
+      <label class="f"><span>Head</span><select id="kHead"><option value="fixed">Fixed in the cap</option><option value="free">Free</option></select></label>
+      <label class="f"><span>Free length above cut-off (m)</span><input id="ke" type="number" step="0.1"></label>
+      <label class="f"><span>Concrete fck (MPa)</span><input id="kFck" type="number"></label>
+    </div>
+    <div class="row3">
+      <label class="f"><span>Earth pressure K (1–1.5)</span><input id="kK" type="number" step="0.1"></label>
+      <label class="f"><span>Nq from IS 2911 Fig. 1</span><input id="kNq" type="number" placeholder="IS 6403 value"></label>
+      <label class="f"><span>Capacity from</span><select id="kMeth"><option value="lower">Lower of static and SPT</option><option value="static">Static formula</option><option value="spt">SPT (B-4)</option></select></label>
+    </div>
+    <div class="note">Layers that settle and drag the pile down (fill, soft clay under new fill) — tick for negative skin friction:</div>
+    <div id="kNsf" class="btns"></div>
+    <h3 style="margin-top:10px">Group</h3>
+    <div class="row3"><label class="f"><span>Piles along x</span><input id="kNx" type="number" min="1"></label><label class="f"><span>Piles along y</span><input id="kNy" type="number" min="1"></label><label class="f"><span>Spacing (m)</span><input id="kS" type="number" step="0.05"></label></div>
+    <div class="btns"><button class="btn" id="kNew">New pile</button><button class="btn" id="kDup">Copy pile</button><button class="btn dan" id="kDel">Delete pile</button></div>
+  </div>
+  <div class="card"><h3>Axial capacity</h3><div id="kRes"></div><ol class="steps" id="kSteps"></ol></div>
+  <div class="card"><h3>Group</h3><div id="kGrp"></div></div>
+  <div class="card"><h3>Lateral load — IS 2911 Annex C on a Winkler beam</h3><div id="kLat"></div><div class="cvw" style="margin-top:8px"><canvas id="latCv"></canvas></div>
+    <div class="leg"><span><i style="background:var(--blue)"></i>Deflection</span><span><i style="background:var(--acc)"></i>Bending moment</span></div></div>
+  <div class="card"><h3>Springs for IS StructDesign</h3><div id="kSpr"></div><div class="btns"><button class="btn" id="kCsv">Save springs (.csv)</button></div></div>
+</section>
+
 <section id="plate">
   <div class="chips" id="pChips"></div>
   <div class="card">
@@ -206,6 +244,7 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
 </main>
 <div class="toast" id="toast"></div>
 <script src="js/gcore.js"></script>
+<script src="js/gpile.js"></script>
 <script src="js/gui.js"></script>
 </body>
 </html>

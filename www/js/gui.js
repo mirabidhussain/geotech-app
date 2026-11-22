@@ -17,7 +17,7 @@
   function changed() { persist(); refresh(); }
   $("bUndo").onclick = function () { if (!S.undo.length) return toast("Nothing to undo"); P = JSON.parse(S.undo.pop()); changed(); };
   function cur(list, id) { return list.filter(function (x) { return x.id === id; })[0] || list[0] || null; }
-  function bh() { return cur(P.boreholes, S.bh); } function ft() { return cur(P.footings, S.f); } function lab() { return cur(P.labs, S.lab); } function pt() { return cur(P.plates, S.pt); }
+  function bh() { return cur(P.boreholes, S.bh); } function ft() { return cur(P.footings, S.f); } function lab() { return cur(P.labs, S.lab); } function pt() { return cur(P.plates, S.pt); } function pk() { return cur(P.piles || (P.piles = []), S.pk); }
 
   /* ---------------- files ---------------- */
   var DL = null; try { if (window.claude && window.claude.use) window.claude.use("downloads").then(function (d) { DL = d; }, function () {}); } catch (e) {}
@@ -46,7 +46,7 @@
     else if (m === "save") download(safe(P.name) + ".isg.json", GC.save(P), "application/json");
     else if (m === "report") show("report");
     else if (m === "theme") { var th = document.documentElement.dataset.th === "dark" ? "" : "dark"; document.documentElement.dataset.th = th; try { localStorage.setItem(THK, th); } catch (er) {} refresh(); }
-    else if (m === "about") alert("IS GeoTech " + GC.VERSION + "\\nShallow foundations from borehole data: SPT corrections, soil classification (IS 1498), bearing capacity (IS 6403), settlement (IS 8009 Part 1), limits (IS 1904:2021), plate load test (IS 1888), pressure bulb and weak-layer checks.\\n\\nCorrelations from SPT are estimates; replace them with test values where you have them. Check results before use in design.".replace(/\\n/g, "\n"));
+    else if (m === "about") alert("IS GeoTech " + GC.VERSION + "\\nShallow foundations from borehole data: SPT corrections, soil classification (IS 1498), bearing capacity (IS 6403), settlement (IS 8009 Part 1), limits (IS 1904:2021), plate load test (IS 1888), pressure bulb and weak-layer checks, bored piles (IS 2911: capacity, groups, negative skin friction, lateral load, springs).\\n\\nCorrelations from SPT are estimates; replace them with test values where you have them. Check results before use in design.".replace(/\\n/g, "\n"));
   };
 
   /* ---------------- generic binding ---------------- */
@@ -171,6 +171,7 @@
       html += '<div class="verdict ' + (okS && okB ? "ok" : "err") + '">Applied net pressure ' + f1(a.qnet, 0) + ' kPa → settlement ' + f1(s.total) + ' mm (limit ' + lim.mm + ' mm), FS on shear ' + f1(a.bc.qnu / a.qnet, 2) + '. ' + (okS && okB ? "Satisfactory." : (!okB ? "Shear capacity exceeded. " : "") + (!okS ? "Settlement too large." : "")) + '</div>';
       if (!(okS && okB)) { var nb = needWidth(f); html += '<div class="note">' + (nb ? "Smallest " + (f.shape === "circle" ? "diameter" : "width") + " that works at this depth: <b>" + f1(nb, 2) + " m</b>" + (f.shape === "rect" ? " (same L/B ratio)" : "") + ". If that is impractical, see which layer governs below — a deeper base or piles may be the answer." : "No width up to 8 m works at this depth — consider founding deeper or on piles.") + '</div>'; }
     }
+    var ks = C_sub(f, a.qnet > 0 ? a.qnet : a.qa); if (ks) html += '<div class="note">Modulus of subgrade reaction at this pressure ks = q/s ≈ <b>' + f1(ks / 1000, 1) + ' MN/m³</b> (for a raft or beam-on-springs model).</div>';
     html += '<div class="note">Differential settlement limit ' + lim.diff + ' L, angular distortion 1/' + lim.ang + ' — ' + esc(lim.name) + ', ' + (lim.fnd === "raft" ? "raft" : "isolated footing") + ' on ' + (lim.soil === "clay" ? "plastic clay" : "sand or hard clay") + ' (IS 1904:2021 Table 1 — guide values).</div>';
     $("fRes").innerHTML = html;
     var fl = GC.failure(P, f), sym = { err: "✘", warn: "⚠", info: "ℹ", ok: "✔" };
@@ -182,6 +183,7 @@
       '<tr><td><b>Total (mm)</b></td><td></td><td class="n"><b>' + f1(st.imm) + '</b></td><td class="n"><b>' + f1(st.con) + '</b></td><td class="n"><b>' + f1(st.total) + '</b></td></tr></table>' + st.notes.map(function (n) { return '<div class="note">' + esc(n) + '</div>'; }).join("");
     drawTime(st, lim.mm);
   }
+  function C_sub(f, q) { try { return GC.subgrade(P, f, q); } catch (e) { return null; } }
   function scaled(f, B) { var g = Object.assign({}, f); if (f.shape === "rect") g.L = +f.L * B / +f.B; g.B = B; return g; }
   function needWidth(f) {
     var lim = GC.limit(P, f).mm;
@@ -249,6 +251,58 @@
     $("bTab").innerHTML = '<table style="margin-top:8px"><tr><th>Layer</th><th class="n">Mid depth (m)</th><th class="n">Δσz (kPa)</th><th class="n">of q</th><th class="n">Settles (mm)</th></tr>' + rows.join("") + '</table>';
   }
 
+
+  /* ---------------- piles ---------------- */
+  function renderPiles() {
+    var p = pk(); chips("pkChips", P.piles, p && p.id, function (id) { S.pk = id; });
+    if (!p) { $("kRes").innerHTML = '<div class="note">No pile yet — add one.</div>'; ["kSteps", "kGrp", "kLat", "kSpr"].forEach(function (i) { $(i).innerHTML = ""; }); return; }
+    S.pk = p.id;
+    $("kBh").innerHTML = P.boreholes.map(function (b) { return '<option value="' + b.id + '">' + esc(b.name) + '</option>'; }).join("");
+    bind("kName", p, "name"); bind("kBh", p, "bh"); bind("kHead", p, "head"); bind("kMeth", p, "method");
+    ["kD:D", "kL:L", "kDf:Df", "kP:P", "kH:H", "kM:M", "ke:e", "kFck:fck", "kK:K", "kNq:Nq", "kNx:nx", "kNy:ny", "kS:s"].forEach(function (q) { var a = q.split(":"); bind(a[0], p, a[1], true); });
+    var b = GC.bh(P, p.bh), nsf = p.nsf || (p.nsf = []);
+    $("kNsf").innerHTML = b.layers.filter(function (L) { return L.top < +p.Df + +p.L && L.bot > +p.Df; }).map(function (L) { return '<label class="chip' + (nsf.indexOf(L.id) >= 0 ? " on" : "") + '" style="cursor:pointer"><input type="checkbox" data-n="' + L.id + '" style="display:none"' + (nsf.indexOf(L.id) >= 0 ? " checked" : "") + '>' + esc(L.name || GC.KINDS[L.kind]) + '</label>'; }).join("");
+    var c = GC.pileCap(P, p);
+    if (c.err) { $("kRes").innerHTML = '<div class="verdict err">' + esc(c.err) + '</div>'; ["kSteps", "kGrp", "kLat", "kSpr"].forEach(function (i) { $(i).innerHTML = ""; }); return; }
+    var st = GC.pileSettle(P, p, +p.P || c.Qsafe, c), ok = !(+p.P > 0) || +p.P <= c.Qsafe;
+    $("kRes").innerHTML = '<div class="stat"><div><small>Ultimate capacity (' + c.used + ')</small><b class="big">' + f1(c.Qu, 0) + '</b> kN</div><div><small>Safe load per pile (FS 2.5' + (c.Qneg ? ', less drag' : '') + ')</small><b class="big">' + f1(c.Qsafe, 0) + '</b> kN</div>' +
+      '<div><small>End bearing / shaft</small><b class="big">' + f1(c.Qb, 0) + ' / ' + f1(c.Qs, 0) + '</b> kN</div><div><small>Safe uplift</small><b class="big">' + f1(c.Qup, 0) + '</b> kN</div></div>' +
+      (+p.P > 0 ? '<div class="verdict ' + (ok ? "ok" : "err") + '">Load ' + f1(+p.P, 0) + ' kN per pile ' + (ok ? "≤" : ">") + ' safe load ' + f1(c.Qsafe, 0) + ' kN. Settlement of a single pile ≈ ' + f1(st.s, 1) + ' mm (shortening ' + f1(st.s1, 1) + ', tip ' + f1(st.s2, 1) + ', shaft ' + f1(st.s3, 1) + ').</div>' : '') +
+      (c.spt ? '<div class="note">Static formula ' + f1(c.QuStatic, 0) + ' kN · SPT correlation ' + f1(c.spt.Qu, 0) + ' kN.</div>' : '') +
+      '<table class="mini" style="margin-top:6px"><tr><th>Layer along the shaft</th><th class="n">Depth (m)</th><th class="n">Parameter</th><th class="n">fs (kPa)</th><th class="n">Q (kN)</th></tr>' + c.rows.map(function (x) { return '<tr' + (x.neg ? ' style="color:var(--err)"' : '') + '><td>' + esc(x.name) + (x.neg ? ' — drag' : '') + '</td><td class="n">' + f1(x.top, 1) + '–' + f1(x.bot, 1) + '</td><td class="n">' + (x.kind === "clay" ? "α " + f1(x.alpha, 2) + ", cu " + f1(x.cu, 0) : "φ " + f1(x.phi, 1) + "°") + '</td><td class="n">' + f1(x.fs, 0) + '</td><td class="n">' + f1(x.Q, 0) + '</td></tr>'; }).join("") + '<tr><td>Tip (' + esc(c.tip.name || GC.KINDS[c.tip.kind]) + ')</td><td class="n">' + f1(+p.Df + +p.L, 1) + '</td><td></td><td class="n">' + f1(c.qb, 0) + '</td><td class="n">' + f1(c.Qb, 0) + '</td></tr></table>';
+    $("kSteps").innerHTML = c.steps.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("");
+    var g = GC.pileGroup(P, p, c);
+    $("kGrp").innerHTML = g.n < 2 ? '<div class="note">Single pile — set more than one pile along x or y for a group.</div>' :
+      '<div class="stat"><div><small>' + g.n + ' piles — ultimate (' + g.gov + ')</small><b class="big">' + f1(g.Qu, 0) + '</b> kN</div><div><small>Safe group load</small><b class="big">' + f1(g.Qsafe, 0) + '</b> kN</div>' +
+      '<div><small>Sum of single piles / block</small><b class="big">' + f1(g.sum, 0) + ' / ' + f1(g.block, 0) + '</b> kN</div><div><small>Group settlement (equivalent raft)</small><b class="big">' + (g.settle ? f1(g.settle.total, 1) : "—") + '</b> mm</div></div>' +
+      '<div class="verdict ' + (+p.P * g.n <= g.Qsafe ? "ok" : "err") + '">Group load ' + f1(+p.P * g.n, 0) + ' kN ' + (+p.P * g.n <= g.Qsafe ? "≤" : ">") + ' safe ' + f1(g.Qsafe, 0) + ' kN.</div>' + g.notes.map(function (n) { return '<div class="note">' + esc(n) + '</div>'; }).join("");
+    var l = GC.pileLateral(P, p);
+    $("kLat").innerHTML = '<div class="stat"><div><small>Head deflection under H = ' + f1(+p.H, 0) + ' kN</small><b class="big">' + f1(l.y0, 2) + '</b> mm</div><div><small>Maximum moment' + (p.head === "fixed" ? " (at the head)" : "") + '</small><b class="big">' + f1(Math.abs(p.head === "fixed" ? (Math.abs(l.Mhead) > Math.abs(l.Mmax) ? l.Mhead : l.Mmax) : l.Mmax), 0) + '</b> kN·m</div>' +
+      '<div><small>Equivalent depth of fixity below cut-off</small><b class="big">' + f1(l.zf, 2) + '</b> m</div><div><small>Lateral load for 5 mm (½ of load for 12 mm)</small><b class="big">' + f1(l.Hallow, 0) + '</b> kN</div></div>' +
+      '<div class="note">' + (l.factor ? 'Stiffness factor ' + l.factor + ' = ' + f1(l[l.factor], 2) + ' m, L/' + l.factor + ' = ' + f1(l.rel, 1) + ' → ' + l.type + ' pile (Table 5). ' : '') + 'Springs from IS 2911 Tables 3 and 4 (sand ηh·z, clay 0.2·k1 per metre). For a frame model, a column fixed ' + f1(l.zf, 2) + ' m below the cut-off gives the same head deflection.' + (l.y0 > 5 ? ' <b style="color:var(--err)">Deflection exceeds 5 mm.</b>' : '') + '</div>';
+    drawLat(l, p);
+    var sp = GC.pileSprings(P, p);
+    $("kSpr").innerHTML = '<div class="note">Axial spring at the pile head kv = <b>' + (sp.kv ? f1(sp.kv / 1000, 1) + ' MN/m' : '—') + '</b> (load ÷ settlement). Lateral springs every ' + sp.step + ' m:</div><table class="mini"><tr><th class="n">Depth (m)</th><th class="n">k (kN/m)</th><th>Basis</th></tr>' + sp.rows.map(function (x) { return '<tr><td class="n">' + f1(x.z, 2) + '</td><td class="n">' + f1(x.kx, 0) + '</td><td>' + esc(x.src || "") + '</td></tr>'; }).join("") + '</table>';
+  }
+  $("kNsf").onchange = function (e) { var id = e.target.dataset.n; if (!id) return; commit(); var p = pk(), a = p.nsf || (p.nsf = []), i = a.indexOf(id); if (i >= 0) a.splice(i, 1); else a.push(id); changed(); };
+  $("kNew").onclick = function () { commit(); var p = GC.pileDefault(P.boreholes[0] && P.boreholes[0].id); p.name = "P" + (P.piles.length + 1); P.piles.push(p); S.pk = p.id; changed(); };
+  $("kDup").onclick = function () { var p = pk(); if (!p) return; commit(); var q = JSON.parse(JSON.stringify(p)); q.id = GC.uid(); q.name = p.name + " copy"; P.piles.push(q); S.pk = q.id; changed(); };
+  $("kDel").onclick = function () { var p = pk(); if (!p) return; commit(); P.piles = P.piles.filter(function (x) { return x !== p; }); S.pk = null; changed(); };
+  $("kCsv").onclick = function () { var p = pk(); if (!p) return; var sp = GC.pileSprings(P, p); download(safe(p.name) + "_springs.csv", "depth_m,k_lateral_kN_per_m,basis\n" + sp.rows.map(function (x) { return r(x.z, 3) + "," + r(x.kx, 1) + ",\"" + (x.src || "") + "\""; }).join("\n") + "\naxial_head,," + (sp.kv ? r(sp.kv, 0) + " kN/m" : "") + "\n", "text/csv"); };
+  function drawLat(l, p) {
+    var c = cv("latCv", 0.9, 300), x = c.x, w = c.w, h = c.h, T = 22, B = h - 12, half = w / 2, pts = l.pts, zt = pts[pts.length - 1].z, z0 = pts[0].z;
+    var ym = Math.max.apply(null, pts.map(function (q) { return Math.abs(q.y); })) || 1, Mm = Math.max.apply(null, pts.map(function (q) { return Math.abs(q.M); })) || 1, mut = css("--mut");
+    function Y(z) { return T + (z - z0) / (zt - z0) * (B - T); }
+    [[0, "y", ym * 1000, "deflection (mm)", css("--blue")], [half, "M", Mm, "moment (kN·m)", css("--acc")]].forEach(function (pn) {
+      var L = pn[0] + 30, R = pn[0] + half - 10, cx = (L + R) / 2, sc = (R - L) / 2 / pn[2];
+      x.strokeStyle = css("--line"); x.strokeRect(L, T, R - L, B - T); x.beginPath(); x.moveTo(cx, T); x.lineTo(cx, B); x.stroke();
+      x.fillStyle = mut; x.font = "11px system-ui"; x.textAlign = "center"; x.fillText(pn[3] + " ±" + f1(pn[2], pn[1] === "y" ? 2 : 0), cx, T - 6);
+      x.strokeStyle = pn[4]; x.lineWidth = 2; x.beginPath(); pts.forEach(function (q, i) { var v = pn[1] === "y" ? q.y * 1000 : q.M, X = cx + v * sc; if (i) x.lineTo(X, Y(q.z)); else x.moveTo(X, Y(q.z)); }); x.stroke(); x.lineWidth = 1;
+      if (l.zf > 0 && pn[1] === "y") { x.strokeStyle = css("--err"); x.setLineDash([4, 3]); x.beginPath(); x.moveTo(L, Y(l.zf)); x.lineTo(R, Y(l.zf)); x.stroke(); x.setLineDash([]); x.fillStyle = css("--err"); x.textAlign = "left"; x.fillText("fixity " + f1(l.zf, 2) + " m", L + 3, Y(l.zf) - 3); }
+    });
+    x.fillStyle = mut; x.textAlign = "right"; var stp = zt > 20 ? 5 : zt > 8 ? 2 : 1; for (var z = 0; z <= zt; z += stp) x.fillText(z + " m", 28, Y(z) + 4);
+  }
+
   /* ---------------- plate load test ---------------- */
   function renderPlate() {
     var p = pt(); chips("pChips", P.plates, p && p.id, function (id) { S.pt = id; });
@@ -307,6 +361,10 @@
         '<table class="mini"><tr><th>Layer</th><th class="n">Immediate</th><th class="n">Consolidation</th><th class="n">t₉₀ (yr)</th></tr>' + st.layers.map(function (l) { return '<tr><td>' + esc(l.name) + ' (' + f1(l.top, 1) + '–' + f1(l.bot, 1) + ' m)</td><td class="n">' + f1(l.imm) + '</td><td class="n">' + (l.con ? f1(l.con) : '—') + '</td><td class="n">' + (l.t90 ? f1(l.t90, 2) : '—') + '</td></tr>'; }).join("") + '<tr><td><b>Total, mm</b></td><td></td><td></td><td class="n"><b>' + f1(st.total) + '</b></td></tr></table>' +
         '<p><b>Which part can fail</b></p><ul>' + fl.items.map(function (i) { return '<li>' + esc(i.t) + '</li>'; }).join("") + '</ul>';
     });
+    (P.piles || []).forEach(function (p) { var c = GC.pileCap(P, p); if (c.err) return; var g = GC.pileGroup(P, p, c), l = GC.pileLateral(P, p), st = GC.pileSettle(P, p, +p.P || c.Qsafe, c);
+      h += '<h2>' + esc(p.name) + ' — bored pile ' + p.D + ' m × ' + p.L + ' m from ' + p.Df + ' m (IS 2911 Part 1/Sec 2)</h2><table class="mini"><tr><td>Ultimate capacity (' + c.used + ')</td><td class="n">' + f1(c.Qu, 0) + ' kN</td></tr><tr><td>End bearing / shaft</td><td class="n">' + f1(c.Qb, 0) + ' / ' + f1(c.Qs, 0) + ' kN</td></tr>' + (c.Qneg ? '<tr><td>Negative skin friction (drag)</td><td class="n">' + f1(c.Qneg, 0) + ' kN</td></tr>' : '') + '<tr><td><b>Safe load per pile</b></td><td class="n"><b>' + f1(c.Qsafe, 0) + ' kN</b></td></tr><tr><td>Safe uplift</td><td class="n">' + f1(c.Qup, 0) + ' kN</td></tr><tr><td>Settlement of a single pile at ' + f1(+p.P || c.Qsafe, 0) + ' kN</td><td class="n">' + f1(st.s, 1) + ' mm</td></tr>' +
+        (g.n > 1 ? '<tr><td>Group of ' + g.n + ' at ' + p.s + ' m — safe load (' + g.gov + ')</td><td class="n">' + f1(g.Qsafe, 0) + ' kN</td></tr><tr><td>Group settlement (equivalent raft)</td><td class="n">' + (g.settle ? f1(g.settle.total, 1) : '—') + ' mm</td></tr>' : '') +
+        '<tr><td>Lateral: deflection under ' + f1(+p.H, 0) + ' kN (' + p.head + ' head) / max moment</td><td class="n">' + f1(l.y0, 2) + ' mm / ' + f1(Math.max(Math.abs(l.Mmax), Math.abs(l.Mhead)), 0) + ' kN·m</td></tr><tr><td>Equivalent depth of fixity</td><td class="n">' + f1(l.zf, 2) + ' m</td></tr></table><ol class="steps">' + c.steps.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ol>'; });
     P.plates.forEach(function (p) { var o = GC.plate(p, P); if (o.err) return; h += '<h2>' + esc(p.name) + ' — plate load test (IS 1888)</h2><table class="mini"><tr><td>Plate / footing</td><td class="n">' + p.Bp + ' m / ' + p.Bf + ' m, ' + (p.soil === "clay" ? "clay" : "sand") + '</td></tr><tr><td>Ultimate (plate, log–log break)</td><td class="n">' + f1(o.qu, 0) + ' kPa</td></tr><tr><td>Pressure for ' + o.sLim + ' mm footing settlement</td><td class="n">' + f1(o.qSettle, 0) + ' kPa</td></tr><tr><td><b>Safe bearing pressure</b></td><td class="n"><b>' + f1(o.qa, 0) + ' kPa</b></td></tr></table>'; });
     h += '<p class="note">Correlations from SPT values are estimates and should be replaced by test values where available. Values from IS 1904:2021 Table 1 are guide values. The designer remains responsible for the final bearing pressure.</p>';
     $("rBody").innerHTML = h;
@@ -320,7 +378,7 @@
   /* ---------------- refresh ---------------- */
   function refresh() {
     $("pname").textContent = P.name + " · " + P.boreholes.length + " borehole" + (P.boreholes.length === 1 ? "" : "s") + " · " + P.footings.length + " footing" + (P.footings.length === 1 ? "" : "s");
-    if (tab === "site") renderSite(); else if (tab === "tests") renderTests(); else if (tab === "footing") renderFooting(); else if (tab === "bulb") renderBulb(); else if (tab === "plate") renderPlate(); else if (tab === "report") renderReport();
+    if (tab === "site") renderSite(); else if (tab === "tests") renderTests(); else if (tab === "footing") renderFooting(); else if (tab === "bulb") renderBulb(); else if (tab === "piles") renderPiles(); else if (tab === "plate") renderPlate(); else if (tab === "report") renderReport();
   }
   var rt; window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(refresh, 150); });
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(function () {});

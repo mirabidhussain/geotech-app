@@ -1,7 +1,7 @@
 /* IS GeoTech browser test (Playwright): every tab renders, edits flow through, numbers agree with the engine */
 const { chromium } = require('playwright');
 const path = require('path');
-const GC = require('../www/js/gcore.js');
+global.GC = require('../www/js/gcore.js'); require('../www/js/gpile.js'); const GC = global.GC;
 let pass = 0, fail = 0;
 function ok(n, c, info) { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL ') + n + (!c && info !== undefined ? ' — ' + info : '')); }
 (async () => {
@@ -39,6 +39,19 @@ function ok(n, c, info) { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL 
   ok('Lab sample classified SM (silty sand)', /SM/.test(await pg.textContent('#tOut')));
   await pg.fill('#tLL', '30'); await pg.press('#tLL', 'Tab'); await pg.fill('#tPL', '18'); await pg.press('#tPL', 'Tab'); await pg.waitForTimeout(100);
   ok('Adding LL 30, PL 18 (PI 12 above A-line) → SC', /SC/.test(await pg.textContent('#tOut')), await pg.textContent('#tOut'));
+  /* piles */
+  await pg.click('[data-t=piles]'); await pg.waitForTimeout(200);
+  { const Pp = await pg.evaluate(() => ISG.P), c = GC.pileCap(Pp, Pp.piles[0]), t = await pg.textContent('#kRes');
+    ok('Piles tab shows the engine\'s safe load', t.includes(String(Math.round(c.Qsafe))), t.slice(0, 160));
+    ok('Pile shaft table lists the soft clay with α', /Grey soft silty clay/.test(t) && /α/.test(t));
+    ok('Group of 4 piles reported', /4 piles/.test(await pg.textContent('#kGrp')));
+    ok('Lateral analysis gives the depth of fixity', /depth of fixity/i.test(await pg.textContent('#kLat')));
+    await pg.click('#kNsf label:nth-child(1)'); await pg.waitForTimeout(150);
+    ok('Ticking a layer for negative skin friction shows drag', /drag/.test(await pg.textContent('#kRes')) && await pg.evaluate(() => ISG.P.piles[0].nsf.length === 1));
+    const [dls] = await Promise.all([pg.waitForEvent('download'), pg.click('#kCsv')]);
+    ok('Springs saved as .csv', /_springs\.csv$/.test(dls.suggestedFilename()));
+    await pg.click('[data-t=footing]'); await pg.waitForTimeout(150);
+    ok('Footing shows the modulus of subgrade reaction', /Modulus of subgrade reaction/.test(await pg.textContent('#fRes'))); }
   /* plate */
   await pg.click('[data-t=plate]'); await pg.waitForTimeout(100);
   const pt = await pg.textContent('#ptOut'), po = GC.plate(P.plates[0], P);
@@ -46,7 +59,7 @@ function ok(n, c, info) { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL 
   /* report */
   await pg.click('[data-t=report]'); await pg.waitForTimeout(200);
   const rp = await pg.textContent('#rBody');
-  ok('Report has the profile, classification, footing and plate test', /soil profile/.test(rp) && /IS 1498/.test(rp) && /Allowable net bearing pressure/.test(rp) && /plate load test/.test(rp));
+  ok('Report has the profile, classification, footing and plate test', /soil profile/.test(rp) && /IS 1498/.test(rp) && /Allowable net bearing pressure/.test(rp) && /plate load test/.test(rp) && /bored pile/.test(rp));
   const [dl] = await Promise.all([pg.waitForEvent('download'), pg.click('#rSave')]);
   ok('Report saved as .html', /_report\.html$/.test(dl.suggestedFilename()));
   /* project file */
