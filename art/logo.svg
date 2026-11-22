@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <clipPath id="r"><rect x="0" y="0" width="1024" height="1024" rx="220"/></clipPath>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f2937"/><stop offset="1" stop-color="#111827"/></linearGradient>
+  </defs>
+  <g clip-path="url(#r)">
+    <rect width="1024" height="1024" fill="url(#sky)"/>
+    <rect y="360" width="1024" height="150" fill="#d6b36a"/>
+    <rect y="510" width="1024" height="170" fill="#7f9aa8"/>
+    <rect y="680" width="1024" height="344" fill="#b88a4e"/>
+    <g fill="#000" opacity=".08"><circle cx="120" cy="420" r="9"/><circle cx="300" cy="455" r="7"/><circle cx="820" cy="430" r="8"/><circle cx="660" cy="470" r="6"/><circle cx="160" cy="760" r="12"/><circle cx="420" cy="840" r="10"/><circle cx="760" cy="800" r="13"/><circle cx="900" cy="920" r="10"/><circle cx="260" cy="940" r="9"/></g>
+    <g fill="none" stroke="#60a5fa" stroke-linecap="round"><path d="M392 372 C 382 465.5, 414.0 542, 512 542 C 610.0 542, 642 465.5, 632 372" stroke-width="26" opacity="1"/><path d="M392 372 C 322 559.0, 378.0 712, 512 712 C 646.0 712, 702 559.0, 632 372" stroke-width="20" opacity="0.9"/><path d="M392 372 C 242 669.0, 330.0 912, 512 912 C 694.0 912, 782 669.0, 632 372" stroke-width="14" opacity="0.7"/></g>
+    <rect x="372" y="320" width="280" height="56" rx="10" fill="#e5e7eb"/>
+    <rect x="482" y="150" width="60" height="176" rx="8" fill="#e5e7eb"/>
+    <rect x="0" y="356" width="1024" height="8" fill="#111827" opacity=".35"/>
+  </g>
+</svg>

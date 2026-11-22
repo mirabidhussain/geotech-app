@@ -19,7 +19,7 @@ let t0 = Date.now();
 console.log('  (footing runs ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s)'); t0 = Date.now();
 /* Griffiths & Lane (1999) example 1: 2:1 slope, H = 10, c′ = 0.05γH, φ′ = 20°, no foundation layer → FoS ≈ 1.4 (Bishop–Morgenstern 1.38) */
 const s = { H: 10, beta: Math.atan(0.5) * 180 / Math.PI, toe: 10, crest: 15, depth: 0, water: null, q: 0, layers: [{ bot: -1e9, c: 10, phi: 20, psi: 0, gamma: 20, gsat: 20, E: 1e5, nu: 0.3 }] };
-const fe = C.slopeSSR(s, { prec: 0.02 });
+const bi0 = C.bishop(s); const fe = C.slopeSSR(s, { prec: 0.01, start: bi0.F });
 ok('Griffiths & Lane example 1: SSR factor of safety 1.4 (±5 %)', fe.fos > 1.33 && fe.fos < 1.47, fe.fos && fe.fos.toFixed(3));
 const bi = C.bishop(s);
 ok('Bishop simplified on the same slope ≈ 1.38 (±4 %)', bi && bi.F > 1.32 && bi.F < 1.44, bi && bi.F.toFixed(3));
@@ -28,17 +28,17 @@ ok('Failure mechanism: plastic strain concentrated in a band', fe.gp.filter(v =>
 console.log('  (slope runs ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s, ' + fe.trials.length + ' trials)'); t0 = Date.now();
 /* undrained slope with a foundation layer: FE vs Bishop */
 const u = { H: 10, beta: 45, toe: 12, crest: 15, depth: 5, water: null, q: 0, layers: [{ bot: -1e9, c: 40, phi: 0, psi: 0, gamma: 18, gsat: 18, E: 1e5, nu: 0.45 }] };
-const fu = C.slopeSSR(u, { prec: 0.02 }), bu = C.bishop(u);
+const bu = C.bishop(u), fu = C.slopeSSR(u, { prec: 0.01, start: bu.F });
 ok('Undrained 45° slope with a foundation layer: FE and Bishop within 8 %', fu.fos && bu && Math.abs(fu.fos - bu.F) / bu.F < 0.08, fu.fos + ' / ' + (bu && bu.F));
 /* vertical cut in undrained clay: Taylor stability number 0.261 → F = c/(0.261·γ·H) */
 const vc = { H: 5, beta: 90, toe: 8, crest: 12, depth: 5, water: null, q: 0, layers: [{ bot: -1e9, c: 40, phi: 0, psi: 0, gamma: 18, gsat: 18, E: 1e5, nu: 0.45 }] };
-const fv = C.slopeSSR(vc, { prec: 0.02 }), Ft = 40 / (0.261 * 18 * 5);
+const fv = C.slopeSSR(vc, { prec: 0.01, start: C.bishop(vc).F }), Ft = 40 / (0.261 * 18 * 5);
 ok('Vertical cut, undrained: FE within 8 % of Taylor (F = ' + Ft.toFixed(2) + ')', fv.fos && Math.abs(fv.fos - Ft) / Ft < 0.08, fv.fos);
 /* a crest surcharge lowers the factor of safety */
 const sq = C.bishop(Object.assign({}, s, { q: 20 })); ok('Crest surcharge lowers Bishop\'s FoS', sq.F < bi.F - 0.02, sq.F);
 /* fully submerged cohesionless slope: infinite-slope value tan φ′ / tan β with buoyant weight */
 const sub = { H: 6, beta: 30, toe: 8, crest: 10, depth: 3, q: 0, water: 9, layers: [{ bot: -1e9, c: 0.01, phi: 35, psi: 0, gamma: 20, gsat: 20, E: 2e4, nu: 0.3 }] };
-const Finf = Math.tan(35 * Math.PI / 180) / Math.tan(30 * Math.PI / 180), bs = C.bishop(sub), fs2 = C.slopeSSR(sub, { prec: 0.02 });
+const Finf = Math.tan(35 * Math.PI / 180) / Math.tan(30 * Math.PI / 180), bs = C.bishop(sub), fs2 = C.slopeSSR(sub, { prec: 0.01, start: bs.F });
 ok('Submerged sand slope: Bishop and FE within 5 % of tan φ′/tan β = ' + Finf.toFixed(3), Math.abs(bs.F - Finf) / Finf < 0.05 && Math.abs(fs2.fos - Finf) / Finf < 0.05, bs.F.toFixed(3) + ' / ' + fs2.fos);
 /* a water table inside a cohesive-frictional slope (toe dry) lowers the factor of safety */
 const w = Object.assign({}, s, { water: 4 }), bw = C.bishop(w);

@@ -4,7 +4,7 @@
 var GC = (function () {
   "use strict";
   var C = {}, GW = 9.81, D2R = Math.PI / 180;
-  C.VERSION = "1.2";
+  C.VERSION = "2.0";
   var uidN = 0; C.uid = function () { return "g" + Date.now().toString(36) + (uidN++).toString(36); };
   function r(v, d) { var k = Math.pow(10, d === undefined ? 2 : d); return Math.round(v * k) / k; }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -14,9 +14,11 @@ var GC = (function () {
   C.KINDS = { sand: "Sand", gravel: "Gravel", silt: "Silt", clay: "Clay", rock: "Weathered rock" };
   C.blank = function (name) {
     return { app: "IS GeoTech", v: C.VERSION, name: name || "New site", fs: 2.5, struct: "rc", depthF: false, cut: 0.1,
-      boreholes: [], footings: [], plates: [], labs: [], piles: [], slopes: [] };
+      boreholes: [], footings: [], plates: [], labs: [], piles: [], slopes: [], tests: [], walls: [], rocks: [],
+      seis: { bh: "", zone: "V", amax: "", Mw: 7.5, ER: 60, Db: 150 }, plan: { L: 30, W: 20, type: "isolated", Df: 1.5, B: 2, Lp: 15 } };
   };
   C.layer = function (o) {
+    if (o && o.kind === "clay" && o.phi === undefined) o = Object.assign({ phi: 0 }, o); /* drained φ′ of clay only when entered */
     return Object.assign({ id: C.uid(), top: 0, bot: 1, name: "", kind: "sand", gamma: 18, gsat: 19, c: 0, phi: 30, cu: 0, Dr: 0, E: 0, nu: 0.3,
       Cc: 0, Cr: 0, e0: 0, pc: 0, mv: 0, cv: 0 }, o || {});
   };
@@ -24,15 +26,23 @@ var GC = (function () {
     var P = C.blank("Sample site — Srinagar alluvium");
     P.boreholes.push({ id: "bh1", name: "BH-1", gwt: 2.0, layers: [
       C.layer({ top: 0, bot: 1.0, name: "Filled-up soil", kind: "silt", gamma: 17, gsat: 18, c: 5, phi: 24, E: 6000, nu: 0.3 }),
-      C.layer({ top: 1.0, bot: 4.0, name: "Brown silty sand, medium dense", kind: "sand", gamma: 18, gsat: 19.5, phi: 0, E: 0, nu: 0.3 }),
+      C.layer({ top: 1.0, bot: 4.0, name: "Brown silty sand, medium dense", kind: "sand", gamma: 18, gsat: 19.5, phi: 0, E: 0, nu: 0.3, fc: 18 }),
       C.layer({ top: 4.0, bot: 7.0, name: "Grey soft silty clay", kind: "clay", gamma: 17.5, gsat: 17.5, cu: 30, E: 9000, nu: 0.5, Cc: 0.28, Cr: 0.04, e0: 0.95, pc: 0, cv: 2.0 }),
-      C.layer({ top: 7.0, bot: 15.0, name: "Dense sandy gravel", kind: "gravel", gamma: 19, gsat: 20.5, phi: 38, E: 60000, nu: 0.3 })
+      C.layer({ top: 7.0, bot: 15.0, name: "Dense sandy gravel", kind: "gravel", gamma: 19, gsat: 20.5, phi: 38, E: 60000, nu: 0.3, fc: 4 })
     ], spt: [{ z: 1.5, N: 9 }, { z: 3.0, N: 14 }, { z: 4.5, N: 4 }, { z: 6.0, N: 5 }, { z: 7.5, N: 32 }, { z: 9.0, N: 41 }, { z: 10.5, N: 48 }] });
     P.footings.push({ id: "f1", name: "F1 (interior column)", bh: "bh1", shape: "square", B: 2.0, L: 2.0, Df: 1.5, P: 900, H: 0, eB: 0, eL: 0, x: 0, y: 0 });
     P.piles.push({ id: "pl1", name: "P1 (2 × 2 group under C4)", bh: "bh1", D: 0.5, L: 12, Df: 1.5, fck: 25, P: 600, H: 30, M: 0, e: 0, head: "fixed", K: 1.0, Nq: "", method: "lower", nsf: [], nx: 2, ny: 2, s: 1.5 });
     P.slopes.push({ id: "s1", name: "River bund, 1.5:1", H: 6, beta: 33.7, toe: 8, crest: 10, depth: 5, water: 2, q: 10, layers: [
       { name: "Compacted silty fill", bot: 0, c: 8, phi: 27, gamma: 18, gsat: 19, E: 15000, nu: 0.3 },
       { name: "Soft silty clay (drained)", bot: -1e9, c: 4, phi: 22, gamma: 17.5, gsat: 17.5, E: 8000, nu: 0.35 }] });
+    P.walls.push({ id: "w1", name: "Road-side gravity wall", type: "gravity", H: 4, B: 2.4, bt: 0.6, bf: 0.1, gc: 22, tb: 0.4, Lt: 0.6, sb: 0.35, st: 0.2, g: 18, phi: 30, i: 15, q: 10, hw: 0, mu: 0.5, qa: 250, D: 0.6, passive: false, seismic: false, ah: 0.18, av: 0.12 });
+    P.rocks.push({ id: "r1", name: "Limestone at 9 m (Pir Panjal foothills)", ucs: 45, rqd: 70, sp: 0.4, cond: 1, gw: 1, orient: 1, ap: 2, B: 2 });
+    P.tests.push({ id: "t1", kind: "compaction", name: "Borrow pit A — light compaction", G: 2.68, rows: [[10, 1.98], [12, 2.09], [14, 2.17], [16, 2.18], [18, 2.13]] });
+    P.tests.push({ id: "t2", kind: "cbr", name: "Subgrade, soaked", rows: [[0, 0], [0.5, 0.35], [1, 0.72], [1.5, 1.05], [2, 1.32], [2.5, 1.55], [3, 1.74], [4, 2.05], [5, 2.31], [7.5, 2.82]] });
+    P.tests.push({ id: "t3", kind: "shear", name: "BH-1 @ 2.5 m, silty sand", rows: [[50, 38], [100, 69], [150, 101]] });
+    P.tests.push({ id: "t4", kind: "triax", name: "BH-1 @ 5 m, grey clay (UU)", type: "UU", rows: [[50, 58], [100, 62], [150, 61]] });
+    P.tests.push({ id: "t5", kind: "consol", name: "BH-1 @ 5.5 m, grey clay", e0: 0.95, t90: 9, H: 20, drain: "two", rows: [[12.5, 0.948], [25, 0.944], [50, 0.935], [100, 0.904], [200, 0.82], [400, 0.735], [800, 0.65], [200, 0.668], [50, 0.69]] });
+    P.seis.bh = "bh1";
     P.plates.push({ id: "p1", name: "PLT-1 at 1.5 m", Bp: 0.3, Bf: 2.0, soil: "sand", rows: [[0, 0], [50, 1.1], [100, 2.4], [150, 3.9], [200, 5.8], [250, 8.3], [300, 12.0], [350, 17.5], [400, 25.5]] });
     P.labs.push({ id: "l1", name: "BH-1 @ 2.0 m", sieve: [[4.75, 0], [2.0, 18], [0.425, 112], [0.075, 205]], total: 500, LL: 0, PL: 0, organic: false });
     return P;
@@ -249,7 +259,7 @@ var GC = (function () {
     var rr = Math.hypot(x, y);
     if (z < 1e-6) return rr < R ? q : 0;
     if (rr < 1e-9) return q * (1 - Math.pow(1 / (1 + (R / z) * (R / z)), 1.5));
-    var s = 0, nr = 40, nt = 72;
+    var s = 0, nr = 30, nt = 60;
     for (var i = 0; i < nr; i++) { var ra = R * (i + 0.5) / nr, dA = (R / nr) * ra * 2 * Math.PI / nt;
       for (var j = 0; j < nt; j++) { var t = 2 * Math.PI * (j + 0.5) / nt, dx = ra * Math.cos(t) - x, dy = ra * Math.sin(t) - y, R2 = dx * dx + dy * dy + z * z; s += 3 * z * z * z / (2 * Math.PI * Math.pow(R2, 2.5)) * dA; } }
     return q * s;
@@ -271,9 +281,9 @@ var GC = (function () {
     opt = opt || {}; var d = dims(f), B = d.B1, cx = +f.x || 0, cy = +f.y || 0, nx = opt.nx || 61, nz = opt.nz || 61;
     var x0 = cx - 2.5 * B, x1 = cx + 2.5 * B, z0 = +f.Df, z1 = +f.Df + (opt.depth || Math.max(4 * B, f.shape === "strip" ? 6 * B : 4 * B));
     if (opt.group) { P.footings.forEach(function (g) { if (+g.y === cy || f.shape === "strip") { x0 = Math.min(x0, +g.x - 2 * dims(g).B1); x1 = Math.max(x1, +g.x + 2 * dims(g).B1); } }); }
-    var q = +f.P > 0 ? +f.P / d.A1 : 100, v = [];
-    for (var j = 0; j < nz; j++) { var row = [], z = z0 + (z1 - z0) * j / (nz - 1);
-      for (var i = 0; i < nx; i++) { var x = x0 + (x1 - x0) * i / (nx - 1); row.push(opt.group ? C.dsigAll(P, x, cy, z) : C.dsig(f, q, x, cy, z - z0)); } v.push(row); }
+    var q = +f.P > 0 ? +f.P / d.A1 : 100, v = [], sym = !opt.group && Math.abs((x0 + x1) / 2 - cx) < 1e-9; /* symmetric section: compute one half */
+    for (var j = 0; j < nz; j++) { var row = new Array(nx), z = z0 + (z1 - z0) * j / (nz - 1);
+      for (var i = 0; i < nx; i++) { if (sym && i > (nx - 1) / 2) { row[i] = row[nx - 1 - i]; continue; } var x = x0 + (x1 - x0) * i / (nx - 1); row[i] = opt.group ? C.dsigAll(P, x, cy, z) : C.dsig(f, q, x, cy, z - z0); } v.push(row); }
     return { x0: x0, x1: x1, z0: z0, z1: z1, nx: nx, nz: nz, v: v, q: q };
   };
   /* marching squares → line segments for one level */

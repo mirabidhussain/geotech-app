@@ -1,7 +1,7 @@
 /* IS GeoTech browser test (Playwright): every tab renders, edits flow through, numbers agree with the engine */
 const { chromium } = require('playwright');
 const path = require('path');
-global.GC = require('../www/js/gcore.js'); require('../www/js/gpile.js'); require('../www/js/gfe.js'); const GC = global.GC;
+global.GC = require('../www/js/gcore.js'); ['gpile', 'gfe', 'gseis', 'gwall', 'glab'].forEach(m => require('../www/js/' + m + '.js')); const GC = global.GC;
 let pass = 0, fail = 0;
 function ok(n, c, info) { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL ') + n + (!c && info !== undefined ? ' — ' + info : '')); }
 (async () => {
@@ -62,6 +62,37 @@ function ok(n, c, info) { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL 
   await pg.click('#feMode [data-m=foot]'); await pg.selectOption('#ffMode', 'undrained'); await pg.click('#ffRun');
   await pg.waitForFunction(() => /Collapse pressure/.test(document.getElementById('ffRes').textContent), null, { timeout: 240000 });
   ok('Footing loaded to collapse: FE and IS 6403 values shown', /IS 6403 net ultimate/.test(await pg.textContent('#ffRes')));
+  /* background worker available from file:// */
+  ok('Analyses run on a background worker', await pg.evaluate(() => new Promise(res => { try { const w = new Worker(URL.createObjectURL(new Blob([GT_ENGINE_SRC], { type: 'text/javascript' }))); w.onmessage = e => res(e.data.type === 'done'); w.onerror = () => res(false); w.postMessage({ id: 1, cmd: 'ping' }); } catch (e) { res(false); } })));
+  /* lab tests: other modes */
+  await pg.click('[data-t=tests]'); await pg.click('#tMode [data-m=consol]'); await pg.waitForTimeout(150);
+  ok('Consolidation test gives Cc and σ′p', /Compression index Cc/.test(await pg.textContent('#ltOut')) && /kPa/.test(await pg.textContent('#ltOut')));
+  await pg.selectOption('#ltApply', { index: 3 }); await pg.waitForTimeout(100);
+  ok('Consolidation result copied to the clay layer', await pg.evaluate(() => ISG.P.boreholes[0].layers[2].Cc > 0.25 && ISG.P.boreholes[0].layers[2].pc > 0), await pg.evaluate(() => JSON.stringify(ISG.P.boreholes[0].layers[2])));
+  for (const m of ['compaction', 'cbr', 'shear', 'triax']) { await pg.click('#tMode [data-m=' + m + ']'); await pg.waitForTimeout(80); ok('Lab test "' + m + '" computes a result', (await pg.$$eval('#ltOut .stat > div', d => d.length)) >= 2); }
+  /* earthquake */
+  await pg.click('[data-t=seis]'); await pg.waitForTimeout(150);
+  ok('Earthquake tab: site class and liquefaction table', /Type I/.test(await pg.textContent('#eqRes')) && (await pg.$$eval('#eqTab tr', t => t.length)) >= 7);
+  /* walls */
+  await pg.click('[data-t=walls]'); await pg.waitForTimeout(150);
+  ok('Wall stability table with IS 14458 checks', (await pg.$$eval('#wlRes table tr', t => t.length)) >= 5);
+  await pg.click('#wlSize'); await pg.waitForTimeout(150);
+  ok('"Find the smallest base width" makes the wall pass', /Satisfies the IS 14458/.test(await pg.textContent('#wlRes')));
+  /* rock */
+  await pg.click('[data-t=rock]'); await pg.waitForTimeout(100);
+  ok('Rock: RMR and IS 12070 allowable pressure', /Rock mass rating/.test(await pg.textContent('#rkRes')) && /MPa/.test(await pg.textContent('#rkRes')));
+  /* library */
+  await pg.click('[data-t=lib]'); await pg.click('#libNav [data-k=charts]'); await pg.waitForTimeout(300);
+  ok('Library shows 14 reference charts', (await pg.$$eval('#libBody img', i => i.filter(x => x.naturalWidth >= 2000).length)) === 14);
+  await pg.click('#libNav [data-k=examples]'); pg.once('dialog', d => d.accept()); await pg.click('[data-ex=liq]'); await pg.waitForTimeout(200);
+  ok('Worked example opens (liquefiable sand)', await pg.evaluate(() => /liquefiable/.test(ISG.P.name)));
+  await pg.click('[data-t=seis]'); await pg.waitForTimeout(150);
+  ok('Example: loose sand liquefies in zone V', /Liquefaction is likely/.test(await pg.textContent('#eqRes')));
+  await pg.click('#bUndo'); await pg.waitForTimeout(100);
+  /* under-reamed pile */
+  await pg.click('[data-t=piles]'); await pg.selectOption('#kType', 'ur'); await pg.waitForTimeout(150);
+  ok('Under-reamed pile: formula and Table 1 safe loads', /Table 1/.test(await pg.textContent('#kRes')));
+  await pg.selectOption('#kType', 'bored'); await pg.waitForTimeout(100);
   /* plate */
   await pg.click('[data-t=plate]'); await pg.waitForTimeout(100);
   const pt = await pg.textContent('#ptOut'), po = GC.plate(P.plates[0], P);
@@ -69,7 +100,8 @@ function ok(n, c, info) { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL 
   /* report */
   await pg.click('[data-t=report]'); await pg.waitForTimeout(200);
   const rp = await pg.textContent('#rBody');
-  ok('Report has the profile, classification, footing and plate test', /soil profile/.test(rp) && /IS 1498/.test(rp) && /Allowable net bearing pressure/.test(rp) && /plate load test/.test(rp) && /bored pile/.test(rp));
+  ok('Report has the profile, classification, footing and plate test', /soil profile/.test(rp) && /IS 1498/.test(rp) && /Allowable net bearing pressure/.test(rp) && /plate load test/.test(rp) && /bored pile/.test(rp) && /IS 14458/.test(rp) && /Laboratory tests/.test(rp));
+  ok('Report carries print-resolution figures', (await pg.$$eval('#rBody img', i => i.filter(x => x.naturalWidth >= 2000).length)) >= 4);
   const [dl] = await Promise.all([pg.waitForEvent('download'), pg.click('#rSave')]);
   ok('Report saved as .html', /_report\.html$/.test(dl.suggestedFilename()));
   /* project file */

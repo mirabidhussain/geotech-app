@@ -1,11 +1,11 @@
 {
   "name": "is-geotech",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "private": true,
   "description": "IS GeoTech — soil profiles, bearing capacity (IS 6403), settlement (IS 8009), pressure bulb and plate load tests. Offline web app + Android WebView.",
   "scripts": {
     "build": "python3 build.py",
-    "test": "node test/core_test.js && node test/pile_test.js && node test/fe_test.js",
+    "test": "node test/core_test.js && node test/pile_test.js && node test/fe_test.js && node test/codes_test.js",
     "test:ui": "python3 build.py && node test/ui_test.js"
   },
   "devDependencies": {

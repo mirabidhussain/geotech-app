@@ -8,11 +8,16 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <style>
+@font-face{font-family:"Inter";src:url(fonts/Inter-Regular.otf) format("opentype");font-weight:400;font-display:swap}
+@font-face{font-family:"Inter";src:url(fonts/Inter-SemiBold.otf) format("opentype");font-weight:600;font-display:swap}
+@font-face{font-family:"Inter";src:url(fonts/Inter-Bold.otf) format("opentype");font-weight:700;font-display:swap}
+@font-face{font-family:"GTMono";src:url(fonts/DejaVuSansMono.ttf) format("truetype");font-display:swap}
+
 :root{--bg:#f4f2ee;--card:#fff;--ink:#1b1d21;--mut:#6b7078;--line:#e2ded6;--acc:#b5862a;--acc2:#8a6418;--hdr:#121418;--hdri:#f3efe6;--ok:#1f7a4d;--warn:#b26b00;--err:#b42318;--sel:#d97706;
   --cv:#fbfaf7;--grid:#9ca3af;--blue:#1d4ed8}
 html[data-th=dark]{--bg:#14161a;--card:#1c1f24;--ink:#e8e6e1;--mut:#9aa0a8;--line:#2c3037;--hdr:#0d0f12;--cv:#181b20;--grid:#4b5563;--blue:#60a5fa}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);overscroll-behavior:none}
+body{margin:0;font:15px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-feature-settings:"tnum" 1,"cv11" 1;background:var(--bg);color:var(--ink);overscroll-behavior:none}
 header{position:sticky;top:0;z-index:20;background:var(--hdr);color:var(--hdri);display:flex;align-items:center;gap:10px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top))}
 header img{width:30px;height:30px;border-radius:7px}
 header .t{flex:1;min-width:0}header .t b{display:block;font-size:16px;letter-spacing:.2px}header .t small{display:block;color:#b9b3a6;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -82,7 +87,7 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
 </div>
 <input type="file" id="fOpen" accept=".json,application/json,text/plain,*/*" hidden>
 <nav class="tabs" id="tabs">
-  <button data-t="site" class="on">Site</button><button data-t="tests">Lab tests</button><button data-t="footing">Footing</button><button data-t="bulb">Pressure bulb</button><button data-t="piles">Piles</button><button data-t="fe">2D FE</button><button data-t="plate">Plate test</button><button data-t="report">Report</button>
+  <button data-t="site" class="on">Site</button><button data-t="tests">Lab tests</button><button data-t="footing">Footing</button><button data-t="bulb">Pressure bulb</button><button data-t="piles">Piles</button><button data-t="fe">2D FE</button><button data-t="seis">Earthquake</button><button data-t="walls">Walls</button><button data-t="rock">Rock</button><button data-t="plate">Plate test</button><button data-t="lib">Library</button><button data-t="report">Report</button>
 </nav>
 <main>
 <section id="site" class="on">
@@ -117,9 +122,22 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
     <div class="note">N′ is corrected for overburden, CN = 0.77 log₁₀(2000/σ′v), at most 2; then for dilatancy in submerged fine sand and silt, N″ = 15 + ½(N′ − 15) when N′ &gt; 15. φ from the Peck–Hanson–Thornburn curve (IS 6403 Fig. 1); Dr after Meyerhof.</div>
   </div>
   <div class="card"><h3>Borehole log</h3><div class="cvw"><canvas id="logCv"></canvas></div></div>
+  <div class="card"><h3>Planning the investigation — IS 1892</h3>
+    <div class="row3"><label class="f"><span>Building length (m)</span><input id="plL" type="number"></label><label class="f"><span>Building width (m)</span><input id="plW" type="number"></label><label class="f"><span>Foundation</span><select id="plT"><option value="isolated">Isolated footings</option><option value="raft">Raft</option><option value="piles">Piles</option></select></label></div>
+    <div class="row3"><label class="f"><span>Founding depth (m)</span><input id="plDf" type="number" step="0.1"></label><label class="f"><span id="plBl">Footing width (m)</span><input id="plB" type="number" step="0.1"></label><label class="f" id="plLpw"><span>Pile length (m)</span><input id="plLp" type="number"></label></div>
+    <div class="list" id="plOut"></div></div>
 </section>
 
 <section id="tests">
+  <div class="chips" id="tMode"><button class="chip on" data-m="cls">Classification</button><button class="chip" data-m="compaction">Compaction</button><button class="chip" data-m="cbr">CBR</button><button class="chip" data-m="shear">Direct shear</button><button class="chip" data-m="triax">Triaxial</button><button class="chip" data-m="consol">Consolidation</button></div>
+  <div id="tOther" style="display:none">
+    <div class="chips" id="ltChips"></div>
+    <div class="card"><h3 id="ltTitle">Test</h3><label class="f"><span>Sample</span><input id="ltName"></label><div id="ltOpts"></div>
+      <table class="mini" id="ltTab"></table><div class="btns"><button class="btn" id="ltRow">Add row</button><button class="btn" id="ltNew">New test</button><button class="btn dan" id="ltDel">Delete test</button></div>
+      <div id="ltOut"></div><div class="cvw" style="margin-top:8px"><canvas id="ltCv"></canvas></div>
+      <div class="btns"><select id="ltApply" class="btn" style="max-width:260px"></select></div></div>
+  </div>
+  <div id="tCls">
   <div class="chips" id="labChips"></div>
   <div class="card">
     <h3>Soil classification (IS 1498)</h3>
@@ -134,6 +152,7 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
     <label class="f" style="display:flex;gap:8px;align-items:center"><input id="tOrg" type="checkbox" style="width:auto"><span style="margin:0">Organic (odour, dark colour)</span></label>
     <div id="tOut"></div>
     <div class="cvw" style="margin-top:8px"><canvas id="gradCv"></canvas></div>
+  </div>
   </div>
 </section>
 
@@ -185,7 +204,8 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
 <section id="piles">
   <div class="chips" id="pkChips"></div>
   <div class="card">
-    <h3>Bored cast-in-situ pile — IS 2911 (Part 1/Sec 2)</h3>
+    <h3 id="kTitle">Pile — IS 2911</h3>
+    <div class="row"><label class="f"><span>Pile type</span><select id="kType"><option value="bored">Bored cast-in-situ (Part 1/Sec 2)</option><option value="ur">Under-reamed (Part 3)</option></select></label><label class="f" id="kUrW"><span>Bulbs / bulb Ø (m)</span><span style="display:flex;gap:6px"><input id="kNb" type="number" min="1" max="4"><input id="kDu" type="number" step="0.05" placeholder="2.5 D"></span></label></div>
     <div class="row"><label class="f"><span>Name</span><input id="kName"></label><label class="f"><span>Borehole</span><select id="kBh"></select></label></div>
     <div class="row3">
       <label class="f"><span>Diameter D (m)</span><input id="kD" type="number" step="0.05"></label>
@@ -241,6 +261,8 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
       <div class="note">Layers from the top down; each ends at the elevation given (toe = 0, crest = H). The last layer continues to the base. Use c′, φ′ for long-term (drained) checks, or cu with φ = 0 for short-term clay.</div>
       <table class="mini" id="slLay"></table>
       <div class="btns"><button class="btn" id="slAddL">Add layer</button><select id="slFrom" class="btn" style="max-width:220px"></select></div>
+      <div class="row"><label class="f"><span>Horizontal seismic coefficient kh (pseudo-static)</span><input id="slKh" type="number" step="0.01" placeholder="0 = static"></label><label class="f"><span>Mesh</span><select id="slMesh"><option value="1">Standard (fast)</option><option value="1.5" selected>Fine</option><option value="2">Very fine (slow)</option></select></label></div>
+      <label class="f"><span>Loading case (IS 7894 minimum factor of safety)</span><select id="slCase"></select></label>
       <div class="btns"><button class="btn pri" id="slRun">Find the factor of safety</button><button class="btn" id="slNew">New slope</button><button class="btn dan" id="slDel">Delete slope</button></div>
       <div class="note" id="slProg"></div>
     </div>
@@ -253,10 +275,56 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
       <h3>Strip footing loaded to collapse</h3>
       <div class="row"><label class="f"><span>Footing (from the Footing tab)</span><select id="ffF"></select></label><label class="f"><span>Soil strength</span><select id="ffMode"><option value="drained">Drained c′, φ′</option><option value="undrained">Undrained cu (clay layers)</option></select></label></div>
       <div class="note">The footing's width and depth are used as a strip (plane strain), half model by symmetry, soil layers from its borehole. Pressure is raised step by step until the soil can no longer carry it.</div>
+      <label class="f"><span>Mesh</span><select id="ffMesh2"><option value="1" selected>Standard</option><option value="1.5">Fine</option></select></label>
       <div class="btns"><button class="btn pri" id="ffRun">Load to collapse</button></div><div class="note" id="ffProg"></div>
     </div>
     <div class="card"><h3>Result</h3><div id="ffRes"></div><div class="cvw"><canvas id="ffCv"></canvas></div><div class="cvw" style="margin-top:8px"><canvas id="ffMesh"></canvas></div></div>
   </div>
+</section>
+
+<section id="seis">
+  <div class="card"><h3>Liquefaction and site class — IS 1893 (Part 1):2016</h3>
+    <div class="row3"><label class="f"><span>Borehole</span><select id="eqBh"></select></label><label class="f"><span>Seismic zone</span><select id="eqZ"><option>II</option><option>III</option><option>IV</option><option>V</option></select></label><label class="f"><span>Peak ground acceleration amax/g (blank = Z)</span><input id="eqA" type="number" step="0.01"></label></div>
+    <div class="row3"><label class="f"><span>Earthquake magnitude Mw</span><input id="eqM" type="number" step="0.1"></label><label class="f"><span>Hammer energy ratio (%)</span><input id="eqER" type="number"></label><label class="f"><span>Borehole diameter (mm)</span><input id="eqDb" type="number"></label></div>
+    <div class="note">Fines content (%) and plasticity index for each layer are set on the Site tab (layer fields "Fines %" and "PI"). Srinagar lies in zone V of IS 1893 (Part 1):2016; the standard was revised in 2025 with a new zone map — use the zone and factor of the edition your project follows (or enter the site PGA).</div></div>
+  <div class="card"><h3>Result</h3><div id="eqRes"></div><div class="cvw" style="margin-top:8px"><canvas id="eqCv"></canvas></div><div id="eqTab"></div></div>
+</section>
+
+<section id="walls">
+  <div class="chips" id="wlChips"></div>
+  <div class="card"><h3>Retaining wall — IS 14458 (Part 2), IS 1893 (Part 3)</h3>
+    <div class="row"><label class="f"><span>Name</span><input id="wlName"></label><label class="f"><span>Type</span><select id="wlType"><option value="gravity">Gravity (masonry / concrete)</option><option value="cantilever">RCC cantilever</option></select></label></div>
+    <div class="row3"><label class="f"><span>Height H (m, to underside of base)</span><input id="wlH" type="number" step="0.1"></label><label class="f"><span>Base width B (m)</span><input id="wlB" type="number" step="0.05"></label><label class="f"><span>Unit weight of wall (kN/m³)</span><input id="wlGc" type="number"></label></div>
+    <div class="row3" id="wlGrav"><label class="f"><span>Top width (m)</span><input id="wlBt" type="number" step="0.05"></label><label class="f"><span>Front batter (horizontal per vertical)</span><input id="wlBf" type="number" step="0.01"></label><label class="f"><span>&nbsp;</span></label></div>
+    <div class="row3" id="wlCant"><label class="f"><span>Base thickness (m)</span><input id="wlTb" type="number" step="0.05"></label><label class="f"><span>Toe length (m)</span><input id="wlLt" type="number" step="0.05"></label><label class="f"><span>Stem at base / top (m)</span><span style="display:flex;gap:6px"><input id="wlSb" type="number" step="0.05"><input id="wlSt" type="number" step="0.05"></span></label></div>
+    <h3 style="margin-top:8px">Backfill and base</h3>
+    <div class="row3"><label class="f"><span>γ (kN/m³)</span><input id="wlG" type="number"></label><label class="f"><span>φ′ (°)</span><input id="wlPhi" type="number"></label><label class="f"><span>Backfill slope i (°)</span><input id="wlI" type="number"></label></div>
+    <div class="row3"><label class="f"><span>Surcharge q (kPa)</span><input id="wlQ" type="number"></label><label class="f"><span>Water behind wall, height above base (m)</span><input id="wlHw" type="number" step="0.1"></label><label class="f"><span>Base friction μ</span><input id="wlMu" type="number" step="0.05"></label></div>
+    <div class="row3"><label class="f"><span>Allowable bearing (gross, kPa)</span><input id="wlQa" type="number"></label><label class="f"><span>Toe embedment D (m)</span><input id="wlD" type="number" step="0.1"></label><label class="f"><span>&nbsp;</span><select id="wlQaFrom"></select></label></div>
+    <label class="f" style="display:flex;gap:8px;align-items:center"><input id="wlPass" type="checkbox" style="width:auto"><span style="margin:0">Count half the passive resistance in front of the toe</span></label>
+    <h3 style="margin-top:8px">Earthquake</h3>
+    <label class="f" style="display:flex;gap:8px;align-items:center"><input id="wlEq" type="checkbox" style="width:auto"><span style="margin:0">Check with earthquake forces (Mononobe–Okabe)</span></label>
+    <div class="row"><label class="f"><span>αh (horizontal)</span><input id="wlAh" type="number" step="0.01"></label><label class="f"><span>αv (vertical)</span><input id="wlAv" type="number" step="0.01"></label></div>
+    <div class="btns"><button class="btn pri" id="wlSize">Find the smallest base width</button><button class="btn" id="wlNew">New wall</button><button class="btn dan" id="wlDel">Delete wall</button></div></div>
+  <div class="card"><h3>Stability</h3><div id="wlRes"></div><div class="cvw" style="margin-top:8px"><canvas id="wlCv"></canvas></div><div id="wlTab"></div></div>
+</section>
+
+<section id="rock">
+  <div class="chips" id="rkChips"></div>
+  <div class="card"><h3>Rock mass rating — IS 13365 (Part 1)</h3>
+    <label class="f"><span>Name</span><input id="rkName"></label>
+    <div class="row3"><label class="f"><span>Intact strength UCS (MPa)</span><input id="rkUcs" type="number"></label><label class="f"><span>RQD (%)</span><input id="rkRqd" type="number"></label><label class="f"><span>Joint spacing (m)</span><input id="rkSp" type="number" step="0.05"></label></div>
+    <label class="f"><span>Condition of joints</span><select id="rkCond"></select></label>
+    <div class="row"><label class="f"><span>Groundwater</span><select id="rkGw"></select></label><label class="f"><span>Joint orientation for foundations</span><select id="rkOr"></select></label></div>
+    <h3 style="margin-top:8px">Foundation on rock — IS 12070</h3>
+    <div class="row"><label class="f"><span>Joint aperture (mm)</span><input id="rkAp" type="number" step="0.5"></label><label class="f"><span>Footing width B (m)</span><input id="rkB" type="number" step="0.1"></label></div>
+    <div class="btns"><button class="btn" id="rkNew">New rock</button><button class="btn dan" id="rkDel">Delete</button></div></div>
+  <div class="card"><h3>Result</h3><div id="rkRes"></div></div>
+</section>
+
+<section id="lib">
+  <div class="chips" id="libNav"></div>
+  <div class="card" id="libBody"></div>
 </section>
 
 <section id="plate">
@@ -282,9 +350,15 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
 </section>
 </main>
 <div class="toast" id="toast"></div>
+<script src="js/engine-src.js"></script>
 <script src="js/gcore.js"></script>
 <script src="js/gpile.js"></script>
 <script src="js/gfe.js"></script>
+<script src="js/gseis.js"></script>
+<script src="js/gwall.js"></script>
+<script src="js/glab.js"></script>
 <script src="js/gui.js"></script>
+<script src="js/gui2.js"></script>
+<script src="js/ref.js"></script>
 </body>
 </html>

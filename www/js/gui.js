@@ -60,12 +60,13 @@
     $(id).innerHTML = list.map(function (x) { return '<button class="chip' + (x.id === sel ? " on" : "") + '" data-id="' + x.id + '">' + esc(x.name) + '</button>'; }).join("");
     $(id).onclick = function (e) { var b = e.target.closest("button"); if (b) { onPick(b.dataset.id); refresh(); } };
   }
-  function cv(id, ratio, minH) { var c = $(id), w = c.parentNode.clientWidth || 340, h = Math.max(minH || 220, Math.round(w * ratio)), d = Math.max(1, window.devicePixelRatio || 1); c.width = w * d; c.height = h * d; c.style.height = h + "px"; var x = c.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, w, h); return { x: x, w: w, h: h }; }
+  function cvS(id, ratio, minH, scale) { if (!scale) return cv(id, ratio, minH); var c = $(id), w = 560, h = Math.max(minH * 2, Math.round(w * ratio)), d = scale; c.width = w * d; c.height = h * d; var x = c.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, w, h); return { x: x, w: w, h: h }; }
+  function cv(id, ratio, minH) { if (S.hi) return cvS(id, ratio, minH / 2.2, S.hi); var c = $(id), w = c.parentNode.clientWidth || 340, h = Math.max(minH || 220, Math.round(w * ratio)), d = Math.max(1, window.devicePixelRatio || 1); c.width = w * d; c.height = h * d; c.style.height = h + "px"; var x = c.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, w, h); return { x: x, w: w, h: h }; }
 
   /* ---------------- site ---------------- */
   var FIELDS = {
     all: [["bot", "Bottom (m)"], ["gamma", "γ bulk (kN/m³)"], ["gsat", "γ sat (kN/m³)"], ["E", "E (kPa)"], ["nu", "Poisson ν"]],
-    gran: [["phi", "φ (°)"], ["c", "c (kPa)"], ["Dr", "Dr (%)"]],
+    gran: [["phi", "φ (°)"], ["c", "c (kPa)"], ["Dr", "Dr (%)"], ["fc", "Fines % (liquefaction)"], ["PI", "PI (silts)"]],
     clay: [["cu", "cu (kPa)"], ["phi", "φ′ drained (°)"], ["c", "c′ (kPa)"], ["Cc", "Cc"], ["Cr", "Cr"], ["e0", "e0"], ["pc", "σ′p (kPa)"], ["cv", "cv (m²/yr)"], ["mv", "mv (m²/MN)"], ["alpha", "Pile α (IS 2911 Fig. 2)"]]
   };
   function renderSite() {
@@ -111,14 +112,14 @@
   function drawLog(b) {
     var c = cv("logCv", 0.95, 300), x = c.x, w = c.w, h = c.h, D = Math.max(GC.depth(b), 1), top = 28, bot = h - 14, k = (bot - top) / D, ink = css("--ink"), mut = css("--mut");
     var colX = 44, colW = Math.min(70, w * 0.18), plotX = colX + colW + 110, plotW = w - plotX - 14, Nmax = 50;
-    x.font = "11px system-ui"; x.fillStyle = mut; x.textAlign = "right";
+    x.font = "11px Inter, system-ui"; x.fillStyle = mut; x.textAlign = "right";
     for (var d = 0; d <= D + 1e-9; d += D > 12 ? 2 : 1) { var y = top + d * k; x.fillText(d + " m", colX - 6, y + 4); x.strokeStyle = css("--line"); x.beginPath(); x.moveTo(colX, y); x.lineTo(w - 10, y); x.stroke(); }
     b.layers.forEach(function (L) { var y1 = top + L.top * k, y2 = top + L.bot * k; x.fillStyle = KC[L.kind]; x.fillRect(colX, y1, colW, y2 - y1); x.strokeStyle = ink; x.strokeRect(colX, y1, colW, y2 - y1);
-      x.fillStyle = ink; x.textAlign = "left"; x.font = "600 11px system-ui"; var nm = L.name || GC.KINDS[L.kind]; wrap(nm, colX + colW + 6, (y1 + y2) / 2 - 4, 104, 12, y2 - y1); });
+      x.fillStyle = ink; x.textAlign = "left"; x.font = "600 11px Inter, system-ui"; var nm = L.name || GC.KINDS[L.kind]; wrap(nm, colX + colW + 6, (y1 + y2) / 2 - 4, 104, 12, y2 - y1); });
     function wrap(t, X, Y, W, lh, H) { var words = t.split(" "), line = "", lines = []; words.forEach(function (wd) { var tt = line ? line + " " + wd : wd; if (x.measureText(tt).width > W && line) { lines.push(line); line = wd; } else line = tt; }); lines.push(line); var max = Math.max(1, Math.floor(H / lh)); lines = lines.slice(0, max); var y0 = Y - (lines.length - 1) * lh / 2 + 4; lines.forEach(function (l, i) { x.fillText(l, X, y0 + i * lh); }); }
     var g = GC.gwt(b); if (isFinite(g)) { var yg = top + g * k; x.strokeStyle = css("--blue"); x.setLineDash([5, 3]); x.beginPath(); x.moveTo(colX - 4, yg); x.lineTo(w - 10, yg); x.stroke(); x.setLineDash([]); x.fillStyle = css("--blue"); x.beginPath(); x.moveTo(colX - 14, yg - 7); x.lineTo(colX - 4, yg - 7); x.lineTo(colX - 9, yg); x.fill(); }
     if (plotW > 60) {
-      x.fillStyle = mut; x.textAlign = "center"; x.font = "11px system-ui"; x.fillText("SPT N (● field, ○ corrected)", plotX + plotW / 2, 14);
+      x.fillStyle = mut; x.textAlign = "center"; x.font = "11px Inter, system-ui"; x.fillText("SPT N (● field, ○ corrected)", plotX + plotW / 2, 14);
       for (var n = 0; n <= Nmax; n += 10) { var px = plotX + n / Nmax * plotW; x.fillText(n, px, top - 4); x.strokeStyle = css("--line"); x.beginPath(); x.moveTo(px, top); x.lineTo(px, bot); x.stroke(); }
       var s = GC.spt(b); [["N", true], ["Nc", false]].forEach(function (q) { x.strokeStyle = q[1] ? ink : css("--acc"); x.fillStyle = x.strokeStyle; x.beginPath(); s.forEach(function (p, i) { var X = plotX + Math.min(p[q[0]], Nmax) / Nmax * plotW, Y = top + p.z * k; if (i) x.lineTo(X, Y); else x.moveTo(X, Y); }); x.stroke(); s.forEach(function (p) { var X = plotX + Math.min(p[q[0]], Nmax) / Nmax * plotW, Y = top + p.z * k; x.beginPath(); x.arc(X, Y, 3.5, 0, 7); q[1] ? x.fill() : x.stroke(); }); });
     }
@@ -142,7 +143,7 @@
   function drawGrad(curve, res) {
     var c = cv("gradCv", 0.6, 220), x = c.x, w = c.w, h = c.h, L = 40, R = w - 12, T = 14, B = h - 30, ink = css("--ink"), mut = css("--mut");
     function X(d) { return L + (Math.log10(d) + 3) / 5 * (R - L); } function Y(p) { return B - p / 100 * (B - T); }
-    x.font = "11px system-ui"; x.fillStyle = mut; x.strokeStyle = css("--line"); x.textAlign = "center";
+    x.font = "11px Inter, system-ui"; x.fillStyle = mut; x.strokeStyle = css("--line"); x.textAlign = "center";
     [0.001, 0.01, 0.1, 1, 10, 100].forEach(function (d) { x.beginPath(); x.moveTo(X(d), T); x.lineTo(X(d), B); x.stroke(); x.fillText(d, X(d), B + 14); });
     x.textAlign = "right"; for (var p = 0; p <= 100; p += 20) { x.beginPath(); x.moveTo(L, Y(p)); x.lineTo(R, Y(p)); x.stroke(); x.fillText(p, L - 4, Y(p) + 4); }
     x.textAlign = "center"; x.fillText("Particle size (mm)", (L + R) / 2, h - 3);
@@ -195,7 +196,7 @@
   function drawTime(st, lim) {
     var c = cv("timeCv", 0.5, 200), x = c.x, w = c.w, h = c.h, L = 42, R = w - 12, T = 16, B = h - 30, mut = css("--mut"), smax = Math.max(st.total, lim) * 1.15 || 1;
     function X(t) { return L + (Math.log10(t) + 2) / 4 * (R - L); } function Y(s) { return T + s / smax * (B - T); }
-    x.font = "11px system-ui"; x.fillStyle = mut; x.strokeStyle = css("--line"); x.textAlign = "center";
+    x.font = "11px Inter, system-ui"; x.fillStyle = mut; x.strokeStyle = css("--line"); x.textAlign = "center";
     [0.01, 0.1, 1, 10, 100].forEach(function (t) { x.beginPath(); x.moveTo(X(t), T); x.lineTo(X(t), B); x.stroke(); x.fillText(t < 1 ? t : t + "", X(t), B + 14); });
     x.fillText("Time after loading (years)", (L + R) / 2, h - 3); x.textAlign = "right";
     var stp = smax > 100 ? 25 : smax > 40 ? 10 : 5; for (var s = 0; s <= smax; s += stp) { x.beginPath(); x.moveTo(L, Y(s)); x.lineTo(R, Y(s)); x.stroke(); x.fillText(s, L - 4, Y(s) + 4); }
@@ -213,17 +214,17 @@
     var fl = GC.failure(P, f), bad = {}, tot = fl.settle ? fl.settle.total || 1 : 1;
     (fl.settle ? fl.settle.layers : []).forEach(function (l) { var st = l.yld ? "err" : (l.imm + l.con) / tot > 0.5 ? "warn" : null; if (st) b.layers.forEach(function (L) { if ((L.name || GC.KINDS[L.kind]) === l.name) bad[L.id] = st; }); });
     fl.items.forEach(function (i) { if (i.sev === "err" && i.layer) bad[i.layer] = "err"; });
-    var g = GC.bulbGrid(P, f, { nx: 71, nz: 71, group: S.group && P.footings.length > 1 }), c = cv("bulbCv", 1.05, 320), x = c.x, w = c.w, h = c.h;
+    var g = GC.bulbGrid(P, f, { nx: 121, nz: 121, group: S.group && P.footings.length > 1 }), c = cv("bulbCv", 1.05, 320), x = c.x, w = c.w, h = c.h;
     var z0 = 0, z1 = g.z1, sx = (w - 20) / (g.x1 - g.x0), sz = (h - 20) / (z1 - z0), s = Math.min(sx, sz), ox = 10 + ((w - 20) - (g.x1 - g.x0) * s) / 2;
     function X(v) { return ox + (v - g.x0) * s; } function Z(v) { return 10 + (v - z0) * s; }
     b.layers.forEach(function (L) { if (L.top > z1) return; var y1 = Z(L.top), y2 = Z(Math.min(L.bot, z1)); x.globalAlpha = 0.45; x.fillStyle = KC[L.kind]; x.fillRect(X(g.x0), y1, (g.x1 - g.x0) * s, y2 - y1); x.globalAlpha = 1;
       if (bad[L.id]) { x.strokeStyle = css(bad[L.id] === "err" ? "--err" : "--warn"); x.lineWidth = 2.5; x.strokeRect(X(g.x0) + 1, y1 + 1, (g.x1 - g.x0) * s - 2, y2 - y1 - 2); x.lineWidth = 1; }
-      x.fillStyle = css("--ink"); x.font = "600 11px system-ui"; x.textAlign = "left"; if (y2 - y1 > 14) x.fillText((L.name || GC.KINDS[L.kind]).slice(0, 40), X(g.x0) + 6, y2 - 6); });
-    var gw = GC.gwt(b); if (gw < z1) { x.strokeStyle = css("--blue"); x.setLineDash([6, 4]); x.beginPath(); x.moveTo(X(g.x0), Z(gw)); x.lineTo(X(g.x1), Z(gw)); x.stroke(); x.setLineDash([]); x.fillStyle = css("--blue"); x.textAlign = "right"; x.font = "11px system-ui"; x.fillText("water table", X(g.x1) - 4, Z(gw) - 4); }
+      x.fillStyle = css("--ink"); x.font = "600 11px Inter, system-ui"; x.textAlign = "left"; if (y2 - y1 > 14) x.fillText((L.name || GC.KINDS[L.kind]).slice(0, 40), X(g.x0) + 6, y2 - 6); });
+    var gw = GC.gwt(b); if (gw < z1) { x.strokeStyle = css("--blue"); x.setLineDash([6, 4]); x.beginPath(); x.moveTo(X(g.x0), Z(gw)); x.lineTo(X(g.x1), Z(gw)); x.stroke(); x.setLineDash([]); x.fillStyle = css("--blue"); x.textAlign = "right"; x.font = "11px Inter, system-ui"; x.fillText("water table", X(g.x1) - 4, Z(gw) - 4); }
     [0.9, 0.7, 0.5, 0.3, 0.2, 0.1, 0.05].forEach(function (lv) {
       var seg = GC.contour(g, lv * g.q); x.strokeStyle = css("--blue"); x.lineWidth = lv >= 0.5 ? 2 : 1.3; x.beginPath(); seg.forEach(function (p) { x.moveTo(X(p[0][0]), Z(p[0][1])); x.lineTo(X(p[1][0]), Z(p[1][1])); }); x.stroke(); x.lineWidth = 1;
       var lowest = null; seg.forEach(function (p) { p.forEach(function (q) { if (Math.abs(q[0] - (+f.x || 0)) < (g.x1 - g.x0) / 60 && (!lowest || q[1] > lowest[1])) lowest = q; }); });
-      if (lowest && [0.5, 0.2, 0.1, 0.05].indexOf(lv) >= 0) { x.fillStyle = css("--blue"); x.font = "600 11px system-ui"; x.textAlign = "center"; x.fillText(lv + "q", X(lowest[0]), Z(lowest[1]) + 12); }
+      if (lowest && [0.5, 0.2, 0.1, 0.05].indexOf(lv) >= 0) { x.fillStyle = css("--blue"); x.font = "600 11px Inter, system-ui"; x.textAlign = "center"; x.fillText(lv + "q", X(lowest[0]), Z(lowest[1]) + 12); }
     });
     (S.group ? P.footings : [f]).forEach(function (q) { var dd = GC.dims(q === f0 ? f : q), bx = q.shape === "strip" ? dd.B1 : dd.B1; x.fillStyle = css("--mut"); x.fillRect(X((+q.x || 0) - bx / 2), Z(+q.Df) - 8, bx * s, 8); });
     x.strokeStyle = css("--ink"); x.beginPath(); x.moveTo(X(g.x0), Z(0)); x.lineTo(X(g.x1), Z(0)); x.stroke();
@@ -241,7 +242,7 @@
     var c = cv("profCv", 0.85, 280), x = c.x, w = c.w, h = c.h, Lx = 44, R = w - 12, T = 22, B = h - 12;
     function X(v) { return Lx + v / smax * (R - Lx); } function Y(z) { return T + (z - Df) / (zmax - Df) * (B - T); }
     b.layers.forEach(function (L) { if (L.bot <= Df || L.top >= zmax) return; var y1 = Y(Math.max(L.top, Df)), y2 = Y(Math.min(L.bot, zmax)); x.globalAlpha = 0.25; x.fillStyle = KC[L.kind]; x.fillRect(Lx, y1, R - Lx, y2 - y1); x.globalAlpha = 1; if (bad[L.id]) { x.strokeStyle = css(bad[L.id] === "err" ? "--err" : "--warn"); x.lineWidth = 2; x.strokeRect(Lx + 1, y1 + 1, R - Lx - 2, y2 - y1 - 2); x.lineWidth = 1; } });
-    x.font = "11px system-ui"; x.fillStyle = css("--mut"); x.strokeStyle = css("--line"); x.textAlign = "center";
+    x.font = "11px Inter, system-ui"; x.fillStyle = css("--mut"); x.strokeStyle = css("--line"); x.textAlign = "center";
     var st = smax > 400 ? 100 : smax > 150 ? 50 : 20; for (var v = 0; v <= smax; v += st) { x.beginPath(); x.moveTo(X(v), T); x.lineTo(X(v), B); x.stroke(); x.fillText(v, X(v), T - 6); }
     x.textAlign = "right"; var zs = zmax - Df > 8 ? 2 : 1; for (var z = Math.ceil(Df); z <= zmax; z += zs) { x.fillText(z + " m", Lx - 4, Y(z) + 4); }
     function line(key, col, w0, dash) { x.strokeStyle = col; x.lineWidth = w0; x.setLineDash(dash || []); x.beginPath(); var on = false; pts.forEach(function (p) { var v = key === "sum" ? p.s0 + p.ds : p[key]; if (v === null) { on = false; return; } if (on) x.lineTo(X(v), Y(p.z)); else { x.moveTo(X(v), Y(p.z)); on = true; } }); x.stroke(); x.setLineDash([]); x.lineWidth = 1; }
@@ -262,6 +263,9 @@
     ["kD:D", "kL:L", "kDf:Df", "kP:P", "kH:H", "kM:M", "ke:e", "kFck:fck", "kK:K", "kNq:Nq", "kNx:nx", "kNy:ny", "kS:s"].forEach(function (q) { var a = q.split(":"); bind(a[0], p, a[1], true); });
     var b = GC.bh(P, p.bh), nsf = p.nsf || (p.nsf = []);
     $("kNsf").innerHTML = b.layers.filter(function (L) { return L.top < +p.Df + +p.L && L.bot > +p.Df; }).map(function (L) { return '<label class="chip' + (nsf.indexOf(L.id) >= 0 ? " on" : "") + '" style="cursor:pointer"><input type="checkbox" data-n="' + L.id + '" style="display:none"' + (nsf.indexOf(L.id) >= 0 ? " checked" : "") + '>' + esc(L.name || GC.KINDS[L.kind]) + '</label>'; }).join("");
+    if (!p.type) p.type = "bored"; bind("kType", p, "type"); bind("kNb", p, "nb", true); bind("kDu", p, "Du", true);
+    $("kUrW").style.display = p.type === "ur" ? "" : "none";
+    if (p.type === "ur") { renderUR(p); return; }
     var c = GC.pileCap(P, p);
     if (c.err) { $("kRes").innerHTML = '<div class="verdict err">' + esc(c.err) + '</div>'; ["kSteps", "kGrp", "kLat", "kSpr"].forEach(function (i) { $(i).innerHTML = ""; }); return; }
     var st = GC.pileSettle(P, p, +p.P || c.Qsafe, c), ok = !(+p.P > 0) || +p.P <= c.Qsafe;
@@ -284,6 +288,16 @@
     var sp = GC.pileSprings(P, p);
     $("kSpr").innerHTML = '<div class="note">Axial spring at the pile head kv = <b>' + (sp.kv ? f1(sp.kv / 1000, 1) + ' MN/m' : '—') + '</b> (load ÷ settlement). Lateral springs every ' + sp.step + ' m:</div><table class="mini"><tr><th class="n">Depth (m)</th><th class="n">k (kN/m)</th><th>Basis</th></tr>' + sp.rows.map(function (x) { return '<tr><td class="n">' + f1(x.z, 2) + '</td><td class="n">' + f1(x.kx, 0) + '</td><td>' + esc(x.src || "") + '</td></tr>'; }).join("") + '</table>';
   }
+  function renderUR(p) {
+    if (!(+p.nb >= 1)) p.nb = 1;
+    var u = GC.underReamed(P, p), d = u.Qdesign, ok = !(+p.P > 0) || +p.P <= d;
+    $("kRes").innerHTML = '<div class="stat"><div><small>Ultimate (formula)</small><b class="big">' + f1(u.Qu, 0) + '</b> kN</div><div><small>Safe load — lesser of formula/2.5 and Table 1</small><b class="big">' + f1(d, 0) + '</b> kN</div><div><small>Safe uplift</small><b class="big">' + f1(Math.min(u.QupSafe, u.table.up), 0) + '</b> kN</div><div><small>Safe lateral load (Table 1)</small><b class="big">' + f1(u.table.lat, 0) + '</b> kN</div></div>' +
+      (+p.P > 0 ? '<div class="verdict ' + (ok ? "ok" : "err") + '">Load ' + f1(+p.P, 0) + ' kN ' + (ok ? "≤" : ">") + ' safe ' + f1(d, 0) + ' kN.</div>' : '') + (u.warn ? '<div class="verdict err">' + esc(u.warn) + '</div>' : '') +
+      '<div class="note">Bulbs of ' + f1(u.Du, 2) + ' m at ' + u.bulbs.map(function (z) { return f1(z, 2); }).join(", ") + ' m below ground. IS 2911 Part 3 Table 1 values are for medium soils with bulb 2.5D; check them against the printed table (the 40 cm row reads unclearly in public scans). Group spacing about 2 × bulb diameter, not less than 1.5 ×.</div>';
+    $("kSteps").innerHTML = u.steps.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("");
+    $("kGrp").innerHTML = '<div class="note">For under-reamed groups keep the spacing at about 2 × bulb diameter (not less than 1.5 ×); the group capacity is then the sum of the piles.</div>'; $("kLat").innerHTML = '<div class="note">Lateral capacity from IS 2911 Part 3 Table 1 (above). The Winkler analysis applies to bored piles.</div>'; $("kSpr").innerHTML = "";
+    var c = cv("latCv", 0.3, 60); c.x.fillStyle = css("--mut"); c.x.font = "12px Inter, system-ui"; c.x.fillText("—", 10, 20);
+  }
   $("kNsf").onchange = function (e) { var id = e.target.dataset.n; if (!id) return; commit(); var p = pk(), a = p.nsf || (p.nsf = []), i = a.indexOf(id); if (i >= 0) a.splice(i, 1); else a.push(id); changed(); };
   $("kNew").onclick = function () { commit(); var p = GC.pileDefault(P.boreholes[0] && P.boreholes[0].id); p.name = "P" + (P.piles.length + 1); P.piles.push(p); S.pk = p.id; changed(); };
   $("kDup").onclick = function () { var p = pk(); if (!p) return; commit(); var q = JSON.parse(JSON.stringify(p)); q.id = GC.uid(); q.name = p.name + " copy"; P.piles.push(q); S.pk = q.id; changed(); };
@@ -296,13 +310,37 @@
     [[0, "y", ym * 1000, "deflection (mm)", css("--blue")], [half, "M", Mm, "moment (kN·m)", css("--acc")]].forEach(function (pn) {
       var L = pn[0] + 30, R = pn[0] + half - 10, cx = (L + R) / 2, sc = (R - L) / 2 / pn[2];
       x.strokeStyle = css("--line"); x.strokeRect(L, T, R - L, B - T); x.beginPath(); x.moveTo(cx, T); x.lineTo(cx, B); x.stroke();
-      x.fillStyle = mut; x.font = "11px system-ui"; x.textAlign = "center"; x.fillText(pn[3] + " ±" + f1(pn[2], pn[1] === "y" ? 2 : 0), cx, T - 6);
+      x.fillStyle = mut; x.font = "11px Inter, system-ui"; x.textAlign = "center"; x.fillText(pn[3] + " ±" + f1(pn[2], pn[1] === "y" ? 2 : 0), cx, T - 6);
       x.strokeStyle = pn[4]; x.lineWidth = 2; x.beginPath(); pts.forEach(function (q, i) { var v = pn[1] === "y" ? q.y * 1000 : q.M, X = cx + v * sc; if (i) x.lineTo(X, Y(q.z)); else x.moveTo(X, Y(q.z)); }); x.stroke(); x.lineWidth = 1;
       if (l.zf > 0 && pn[1] === "y") { x.strokeStyle = css("--err"); x.setLineDash([4, 3]); x.beginPath(); x.moveTo(L, Y(l.zf)); x.lineTo(R, Y(l.zf)); x.stroke(); x.setLineDash([]); x.fillStyle = css("--err"); x.textAlign = "left"; x.fillText("fixity " + f1(l.zf, 2) + " m", L + 3, Y(l.zf) - 3); }
     });
     x.fillStyle = mut; x.textAlign = "right"; var stp = zt > 20 ? 5 : zt > 8 ? 2 : 1; for (var z = 0; z <= zt; z += stp) x.fillText(z + " m", 28, Y(z) + 4);
   }
 
+
+
+  /* ---------------- background jobs (Web Worker, with a main-thread fallback) ---------------- */
+  var WK = null, jobs = {}, jobN = 0;
+  function worker() {
+    if (WK !== null) return WK;
+    try { if (typeof GT_ENGINE_SRC === "undefined" || !window.Worker) throw 0; WK = new Worker(URL.createObjectURL(new Blob([GT_ENGINE_SRC], { type: "text/javascript" })));
+      WK.onmessage = function (ev) { var d = ev.data, j = jobs[d.id]; if (!j) return; if (d.type === "progress") j.prog(d.text); else { delete jobs[d.id]; if (d.type === "done") j.done(d.res); else j.fail(d.text); } };
+      WK.onerror = function (e) { e.preventDefault && e.preventDefault(); var pend = Object.keys(jobs).map(function (k) { return jobs[k]; }); jobs = {}; WK = false; pend.forEach(function (j) { mainThread(j); }); };
+    } catch (e) { WK = false; }
+    return WK;
+  }
+  function mainThread(j) { /* same work without a worker, in small slices so the screen can update */
+    var d = j.msg, t0 = Date.now();
+    if (d.cmd === "slope") {
+      setTimeout(function () { try { var bi = GC.bishop(d.s); j.prog("Bishop " + (bi ? f1(bi.F, 3) : "—") + " — finite elements running (this device has no background thread)…");
+        setTimeout(function () { try { var r = GC.slopeSSR(d.s, { start: bi ? bi.F : 1.2, fine: d.fine || 1, prec: 0.01 }); j.done({ fos: r.fos, note: r.note || "", bi: bi, trials: r.trials.length, mesh: { X: r.M.mesh.X, Y: r.M.mesh.Y, els: r.M.E.map(function (e) { return e.n; }), mi: r.M.E.map(function (e) { return e.mi; }) }, gp: r.gp, ne: r.M.E.length, time: (Date.now() - t0) / 1000 }); } catch (er) { j.fail(er.message); } }, 30); } catch (er) { j.fail(er.message); } }, 20);
+    } else if (d.cmd === "footing") {
+      var st = GC.footingStart(d.f, d.opt);
+      (function loop() { try { GC.footingStep(st); j.prog("Pressure " + f1(st.q, 0) + " kPa, settlement " + f1(st.curve[st.curve.length - 1].s, 1) + " mm…"); if (!st.done) return setTimeout(loop, 5);
+        j.done({ qu: st.q, curve: st.curve, mesh: { X: st.M.mesh.X, Y: st.M.mesh.Y, els: st.M.E.map(function (e) { return e.n; }), mi: st.M.E.map(function (e) { return e.mi; }) }, gp: st.gp, steps: st.n, time: (Date.now() - t0) / 1000 }); } catch (er) { j.fail(er.message); } })();
+    }
+  }
+  function job(msg, prog, done, fail) { var j = { msg: msg, prog: prog, done: done, fail: fail || function (t) { toast("Error: " + t); } }, w = worker(); if (w) { msg.id = ++jobN; jobs[msg.id] = j; w.postMessage(msg); } else mainThread(j); }
 
   /* ---------------- 2D finite elements ---------------- */
   S.feMode = "slope"; S.slRes = {}; S.ffRes = null;
@@ -316,7 +354,9 @@
     var s = sl(); chips("slChips", P.slopes, s && s.id, function (id) { S.sl = id; });
     if (!s) { $("slRes").innerHTML = '<div class="note">No slope yet — add one.</div>'; $("slLay").innerHTML = ""; return; }
     S.sl = s.id; bind("slName", s, "name");
-    ["slH:H", "slB:beta", "slD:depth", "slT:toe", "slC:crest", "slQ:q", "slW:water"].forEach(function (q) { var a = q.split(":"); bind(a[0], s, a[1], true, function () { delete S.slRes[s.id]; }); });
+    $("slCase").innerHTML = GC.SLOPE_CASES.map(function (c) { return '<option value="' + c.k + '">' + esc(c.n) + ' — FoS ≥ ' + c.fs + '</option>'; }).join("");
+    bind("slCase", s, "case", false, function () {});
+    ["slH:H", "slB:beta", "slD:depth", "slT:toe", "slC:crest", "slQ:q", "slW:water", "slKh:kh"].forEach(function (q) { var a = q.split(":"); bind(a[0], s, a[1], true, function () { delete S.slRes[s.id]; }); });
     $("slLay").innerHTML = '<tr><td style="padding:0">' + s.layers.map(function (L, i) { var last = i === s.layers.length - 1;
       return '<div class="lay open" style="margin:6px 0"><div class="b" style="display:block;border:0;padding:8px 10px"><div class="row"><label class="f"><span>Layer ' + (i + 1) + '</span><input data-i="' + i + '" data-k="name" value="' + esc(L.name) + '"></label><label class="f"><span>Ends at elevation (m)</span>' + (last ? '<input disabled value="base of model">' : '<input type="number" step="0.5" data-i="' + i + '" data-k="bot" value="' + L.bot + '">') + '</label></div><div class="grid4">' +
         [["c", "c (kPa)"], ["phi", "φ (°)"], ["gamma", "γ (kN/m³)"], ["gsat", "γsat"], ["E", "E (kPa)"], ["nu", "ν"]].map(function (q) { return '<label class="f"><span>' + q[1] + '</span><input type="number" step="any" data-i="' + i + '" data-k="' + q[0] + '" value="' + (L[q[0]] === undefined ? "" : L[q[0]]) + '"></label>'; }).join("") +
@@ -324,11 +364,11 @@
     $("slFrom").innerHTML = '<option value="">Fill layers from a borehole…</option>' + P.boreholes.map(function (b) { return '<option value="' + b.id + '|drained">' + esc(b.name) + ' — drained c′, φ′</option><option value="' + b.id + '|undrained">' + esc(b.name) + ' — undrained cu for clay</option>'; }).join("");
     var r = S.slRes[s.id];
     if (r) {
-      var need = 1.5, ok = r.fos && r.fos >= need;
+      var cs = GC.SLOPE_CASES.filter(function (c) { return c.k === (s.case || (+s.kh ? "eq" : "gen")); })[0] || GC.SLOPE_CASES[0], need = cs.fs, ok = r.fos && r.fos >= need;
       $("slRes").innerHTML = '<div class="stat"><div><small>Factor of safety — finite elements (strength reduction)</small><b class="big">' + (r.fos ? f1(r.fos, 2) : "—") + '</b>' + (r.note ? '<div class="note">' + esc(r.note) + '</div>' : '') + '</div><div><small>Factor of safety — Bishop simplified (critical circle)</small><b class="big">' + (r.bi ? f1(r.bi.F, 2) : "—") + '</b></div></div>' +
-        (r.fos ? '<div class="verdict ' + (ok ? "ok" : "err") + '">' + (ok ? "Stable with the usual margin (FoS ≥ " + need + " for long-term static conditions)." : r.fos >= 1 ? "Stands, but below the usual FoS of " + need + "." : "Not stable — the slope fails with these strengths.") + '</div>' : '') +
-        '<div class="note">' + r.trials + ' trial analyses, ' + r.ne + ' elements, ' + f1(r.time, 1) + ' s. The two methods normally agree within a few per cent; a large gap usually means a weak layer that circles cannot follow — the FE slip band shows the actual mechanism. The water level is taken as horizontal (no seepage); for steady seepage through a bund the factor of safety will be lower.</div>';
-      drawFE("slCv", r.md.mesh, r.md.M, r.gp, s, r.bi, null);
+        (r.fos ? '<div class="verdict ' + (ok ? "ok" : "err") + '">' + (ok ? "Meets the required factor of safety of " + need + " (" + cs.n + ")." : r.fos >= 1 ? "Stands, but below the required " + need + " for " + cs.n + "." : "Not stable — the slope fails with these strengths.") + '</div>' : '') +
+        '<div class="note">' + r.trials + ' trial analyses, ' + r.ne + ' elements, ' + f1(r.time, 1) + ' s' + (r.inp && r.inp.kh ? ', kh = ' + r.inp.kh : '') + '. The two methods normally agree within a few per cent; a large gap usually means a weak layer that circles cannot follow — the FE slip band shows the actual mechanism. The water level is taken as horizontal (no seepage); for steady seepage through a bund the factor of safety will be lower.</div>';
+      drawFE("slCv", r.mesh, r.gp, s, r.bi);
     } else { var c = cv("slCv", 0.6, 220); drawSlopeGeom(c, s); }
   }
   $("slLay").onchange = function (e) { var el = e.target, s = sl(); if (el.dataset.i === undefined) return; commit(); var L = s.layers[+el.dataset.i]; L[el.dataset.k] = el.dataset.k === "name" ? el.value : +el.value; delete S.slRes[s.id]; changed(); };
@@ -339,27 +379,10 @@
   $("slDel").onclick = function () { var s = sl(); if (!s) return; commit(); P.slopes = P.slopes.filter(function (x) { return x !== s; }); S.sl = null; changed(); };
   $("slRun").onclick = function () {
     var s = sl(); if (!s) return; var btn = this; btn.disabled = true;
-    var t0 = Date.now(), inp = JSON.parse(JSON.stringify(s)); inp.layers.forEach(function (L) { L.psi = 0; L.nu = L.nu || 0.3; if (L.bot <= -1e8) L.bot = -1e9; });
-    if (inp.water === "" || inp.water === undefined) inp.water = null;
-    $("slProg").textContent = "Building the mesh…";
-    setTimeout(function () {
-      var md, bi; try { md = GC.slopeModel(inp, {}); bi = GC.bishop(inp); } catch (er) { $("slProg").textContent = "Error: " + er.message; btn.disabled = false; return; }
-      var lo = 0.3, hi = 4, last = null, n = 0, fos = null, note = "", stage = 0;
-      function done() { var u = last ? last.u : null; S.slRes[s.id] = { fos: fos, note: note, bi: bi, md: md, gp: GC.plasticByElement(md.M), u: u, trials: n, ne: md.M.E.length, time: (Date.now() - t0) / 1000 }; $("slProg").textContent = ""; btn.disabled = false; renderSlope(); }
-      function next() {
-        var srf = stage === 0 ? lo : stage === 1 ? hi : (lo + hi) / 2;
-        $("slProg").textContent = "Trial " + (n + 1) + ": strengths ÷ " + f1(srf, 3) + (stage > 1 ? " — FoS between " + f1(lo, 2) + " and " + f1(hi, 2) : "") + "…";
-        setTimeout(function () {
-          var rr = GC.ssrTrial(md, srf); n++;
-          if (stage === 0) { if (!rr.conv) { fos = null; note = "Fails even with strengths divided by 0.3"; last = rr; return done(); } stage = 1; return next(); }
-          if (stage === 1) { if (rr.conv) { fos = hi; note = "Stable with strengths divided by 4 — FoS at least 4"; last = rr; return done(); } last = rr; stage = 2; return next(); }
-          if (rr.conv) lo = srf; else { hi = srf; last = rr; }
-          if (hi - lo <= 0.01) { fos = (lo + hi) / 2; if (!last || last.srf !== hi) last = GC.ssrTrial(md, hi); return done(); }
-          next();
-        }, 20);
-      }
-      next();
-    }, 30);
+    var inp = JSON.parse(JSON.stringify(s)); inp.layers.forEach(function (L) { L.psi = 0; L.nu = L.nu || 0.3; if (L.bot <= -1e8) L.bot = -1e9; });
+    if (inp.water === "" || inp.water === undefined) inp.water = null; inp.kh = +s.kh || 0;
+    $("slProg").textContent = "Starting…";
+    job({ cmd: "slope", s: inp, fine: +($("slMesh").value || 1.5) }, function (t) { $("slProg").textContent = t; }, function (res) { res.inp = inp; S.slRes[s.id] = res; $("slProg").textContent = ""; btn.disabled = false; renderSlope(); }, function (t) { $("slProg").textContent = "Error: " + t; btn.disabled = false; });
   };
   function drawSlopeGeom(c, s) {
     var g = GC.slopeProfile(s), x = c.x, W = g.x3, Hh = s.H + (+s.depth || 0), sc = Math.min((c.w - 20) / W, (c.h - 20) / Hh), ox = 10, oy = 10 + s.H * sc;
@@ -370,19 +393,20 @@
     if (s.water !== "" && s.water !== null && s.water !== undefined) { x.strokeStyle = css("--blue"); x.setLineDash([6, 4]); x.beginPath(); x.moveTo(X(0), Y(+s.water)); x.lineTo(X(W), Y(+s.water)); x.stroke(); x.setLineDash([]); }
     return { X: X, Y: Y, sc: sc };
   }
-  function drawFE(id, mesh, M, gp, s, bi, u) {
-    var c = cv(id, s ? 0.6 : 0.6, 230), x = c.x, xs = mesh.X, ys = mesh.Y, x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+  function drawFE(id, mesh, gp, s, bi, scale) {
+    var c = cvS(id, 0.6, 230, scale), x = c.x, xs = mesh.X, ys = mesh.Y, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (var i = 0; i < xs.length; i++) { if (xs[i] < x0) x0 = xs[i]; if (xs[i] > x1) x1 = xs[i]; if (ys[i] < y0) y0 = ys[i]; if (ys[i] > y1) y1 = ys[i]; }
     var sc = Math.min((c.w - 20) / (x1 - x0), (c.h - 20) / (y1 - y0)), ox = 10 + ((c.w - 20) - (x1 - x0) * sc) / 2;
     function X(v) { return ox + (v - x0) * sc; } function Y(v) { return 10 + (y1 - v) * sc; }
-    var gmax = Math.max.apply(null, gp) || 1, cols = ["#e2c47a", "#8ea6b4", "#c49a5c", "#c9b899"], o = [0, 2, 4, 6];
-    M.E.forEach(function (e, i) { x.beginPath(); o.forEach(function (k, j) { var n = e.n[k]; if (j) x.lineTo(X(xs[n]), Y(ys[n])); else x.moveTo(X(xs[n]), Y(ys[n])); }); x.closePath();
-      x.fillStyle = cols[e.mi % 4]; x.globalAlpha = 0.45; x.fill(); x.globalAlpha = 1;
+    var gmax = 0; gp.forEach(function (v) { if (v > gmax) gmax = v; }); gmax = gmax || 1;
+    var cols = ["#e2c47a", "#8ea6b4", "#c49a5c", "#c9b899"], o = [0, 2, 4, 6];
+    mesh.els.forEach(function (n8, i) { x.beginPath(); o.forEach(function (k, j) { var n = n8[k]; if (j) x.lineTo(X(xs[n]), Y(ys[n])); else x.moveTo(X(xs[n]), Y(ys[n])); }); x.closePath();
+      x.fillStyle = cols[mesh.mi[i] % 4]; x.globalAlpha = 0.45; x.fill(); x.globalAlpha = 1;
       var t = gp[i] / gmax; if (t > 0.04) { x.fillStyle = "rgba(234,88,12," + Math.min(0.95, 0.15 + t) + ")"; x.fill(); }
-      x.strokeStyle = "rgba(120,120,120,.25)"; x.stroke(); });
+      x.strokeStyle = "rgba(120,120,120,.25)"; x.lineWidth = 0.6; x.stroke(); x.lineWidth = 1; });
     if (s && s.water !== "" && s.water !== null && s.water !== undefined) { x.strokeStyle = css("--blue"); x.setLineDash([6, 4]); x.beginPath(); x.moveTo(X(x0), Y(+s.water)); x.lineTo(X(x1), Y(+s.water)); x.stroke(); x.setLineDash([]); }
-    if (bi) { x.strokeStyle = css("--err"); x.lineWidth = 2; x.setLineDash([6, 4]); x.beginPath(); var first = true; for (var k = 0; k <= 60; k++) { var xx = bi.xa + (bi.xb - bi.xa) * k / 60, d = bi.R * bi.R - (xx - bi.xc) * (xx - bi.xc); if (d < 0) continue; var yy = bi.yc - Math.sqrt(d); if (first) { x.moveTo(X(xx), Y(yy)); first = false; } else x.lineTo(X(xx), Y(yy)); } x.stroke(); x.setLineDash([]); x.lineWidth = 1; }
-    if (u) { /* movement of the failing mass: arrows at element centres where the displacement is large */ var um = 0; for (var n = 0; n < xs.length; n++) um = Math.max(um, Math.hypot(u[2 * n], u[2 * n + 1]));
-      if (um > 0) { x.strokeStyle = css("--ink"); x.fillStyle = css("--ink"); M.E.forEach(function (e, i) { if (i % 3) return; var n = e.n[4], dx = u[2 * n] / um, dy = u[2 * n + 1] / um, L = Math.hypot(dx, dy); if (L < 0.5) return; var px = X(e.xc), py = Y(e.yc), ex = px + dx * 12, ey = py - dy * 12; x.beginPath(); x.moveTo(px, py); x.lineTo(ex, ey); x.stroke(); x.beginPath(); x.arc(ex, ey, 1.6, 0, 7); x.fill(); }); } }
+    if (bi) { x.strokeStyle = css("--err"); x.lineWidth = 2; x.setLineDash([6, 4]); x.beginPath(); var first = true; for (var k = 0; k <= 80; k++) { var xx = bi.xa + (bi.xb - bi.xa) * k / 80, d = bi.R * bi.R - (xx - bi.xc) * (xx - bi.xc); if (d < 0) continue; var yy = bi.yc - Math.sqrt(d); if (first) { x.moveTo(X(xx), Y(yy)); first = false; } else x.lineTo(X(xx), Y(yy)); } x.stroke(); x.setLineDash([]); x.lineWidth = 1; }
+    return c;
   }
   function renderFF() {
     var opts = P.footings.map(function (f) { return '<option value="' + f.id + '">' + esc(f.name) + ' — ' + f.B + ' m at ' + f.Df + ' m</option>'; }).join("");
@@ -392,10 +416,10 @@
       (r.qu < 0.75 * r.is ? '<div class="verdict err">The finite-element collapse pressure is much lower than the IS 6403 formula. The IS formula uses only the soil within about B below the base; the plastic zone below shows the failure reaching a weaker layer deeper down. Use the lower value, and see "Which part can fail" on the Footing tab.</div>' : r.qu > 1.3 * r.is ? '<div class="note">The finite-element value is higher than IS 6403; the IS formula is the safer basis.</div>' : '<div class="verdict ok">The two agree reasonably — the bearing stratum governs.</div>');
     var c = cv("ffCv", 0.55, 200), x = c.x, w = c.w, h = c.h, L = 44, R = w - 12, T = 16, B = h - 26, cu = r.curve, qm = Math.max(r.qu, r.is) * 1.1, sm = cu[cu.length - 1].s * 1.1 || 1;
     function X(q) { return L + q / qm * (R - L); } function Y(s) { return T + s / sm * (B - T); }
-    x.strokeStyle = css("--line"); x.strokeRect(L, T, R - L, B - T); x.fillStyle = css("--mut"); x.font = "11px system-ui"; x.textAlign = "center"; x.fillText("net pressure (kPa) →  " + f1(qm, 0), (L + R) / 2, h - 8); x.textAlign = "right"; x.fillText(f1(sm, 0) + " mm", L - 3, B);
+    x.strokeStyle = css("--line"); x.strokeRect(L, T, R - L, B - T); x.fillStyle = css("--mut"); x.font = "11px Inter, system-ui"; x.textAlign = "center"; x.fillText("net pressure (kPa) →  " + f1(qm, 0), (L + R) / 2, h - 8); x.textAlign = "right"; x.fillText(f1(sm, 0) + " mm", L - 3, B);
     x.strokeStyle = css("--blue"); x.lineWidth = 2; x.beginPath(); cu.forEach(function (p, i) { if (i) x.lineTo(X(p.q), Y(p.s)); else x.moveTo(X(p.q), Y(p.s)); }); x.stroke(); x.lineWidth = 1;
     x.strokeStyle = css("--acc"); x.setLineDash([5, 4]); x.beginPath(); x.moveTo(X(r.is), T); x.lineTo(X(r.is), B); x.stroke(); x.setLineDash([]); x.fillStyle = css("--acc"); x.textAlign = "right"; x.fillText("IS 6403", X(r.is) - 3, T + 12);
-    drawFE("ffMesh", r.mesh, r.M, r.gp, null, null, null);
+    drawFE("ffMesh", r.mesh, r.gp, null, null);
   }
   $("ffF").onchange = function () { S.ffF = this.value; };
   $("ffRun").onclick = function () {
@@ -407,15 +431,12 @@
     var gw = GC.gwt(b), q0 = GC.sv(b, Df).t - (isFinite(gw) ? Math.max(0, Df - gw) * 9.81 : 0);
     var fs = Object.assign({}, f, { shape: "strip", P: 0, H: 0, eB: 0, eL: 0 }), Pc = JSON.parse(JSON.stringify(P));
     if (und) Pc.boreholes.forEach(function (bb) { bb.layers.forEach(function (L) { if (L.kind === "clay") L.phi = 0; }); });
-    var isq = GC.bearing(Pc, fs).qnu, st = GC.footingStart({ B: +f.B, q0: GC.sv(b, Df).e, layers: layers, water: isFinite(gw) ? Math.max(0, gw - Df) : null }, { dq: Math.max(5, isq / 12), dqMin: Math.max(0.5, isq / 400), limit: 600 });
-    btn.disabled = true;
-    (function loop() {
-      for (var k = 0; k < 1 && !st.done; k++) GC.footingStep(st);
-      $("ffProg").textContent = "Pressure " + f1(st.q, 0) + " kPa, settlement " + f1(st.curve[st.curve.length - 1].s, 1) + " mm…";
-      if (!st.done) return setTimeout(loop, 10);
-      S.ffRes = { qu: st.q, curve: st.curve, M: st.M, mesh: st.mesh, gp: st.gp, u: st.u, is: isq, steps: st.n, time: (Date.now() - t0) / 1000, note: und ? "Undrained: clay layers with cu and φ = 0." : "Drained: c′ and φ′ (non-associated flow, ψ = 0, which gives somewhat lower collapse loads than the IS 6403 factors for φ′ above about 30°)." };
-      $("ffProg").textContent = ""; btn.disabled = false; renderFF();
-    })();
+    var isq = GC.bearing(Pc, fs).qnu, fin = +($("ffMesh2").value || 1);
+    btn.disabled = true; $("ffProg").textContent = "Starting…";
+    job({ cmd: "footing", f: { B: +f.B, q0: GC.sv(b, Df).e, layers: layers, water: isFinite(gw) ? Math.max(0, gw - Df) : null }, opt: { dq: Math.max(5, isq / 12), dqMin: Math.max(0.5, isq / 400), limit: 600, nIn: Math.round(6 * fin), nOut: Math.round(14 * fin), ny: Math.round(14 * fin) } },
+      function (t) { $("ffProg").textContent = t; },
+      function (res) { S.ffRes = Object.assign(res, { is: isq, note: und ? "Undrained: clay layers with cu and φ = 0." : "Drained: c′ and φ′ (non-associated flow, ψ = 0, which gives somewhat lower collapse loads than the IS 6403 factors for φ′ above about 30°)." }); $("ffProg").textContent = ""; btn.disabled = false; renderFF(); },
+      function (t) { $("ffProg").textContent = "Error: " + t; btn.disabled = false; });
   };
 
   /* ---------------- plate load test ---------------- */
@@ -438,7 +459,7 @@
   $("ptDel").onclick = function () { var p = pt(); if (!p) return; commit(); P.plates = P.plates.filter(function (x) { return x !== p; }); S.pt = null; changed(); };
   function drawPlate(o) {
     var c = cv("ptCv", 0.55, 220), x = c.x, w = c.w, h = c.h, half = w / 2, mut = css("--mut"), rows = o.rows, pm = Math.max.apply(null, rows.map(function (q) { return q[0]; })) * 1.05, sm = Math.max.apply(null, rows.map(function (q) { return q[1]; })) * 1.1;
-    x.font = "11px system-ui";
+    x.font = "11px Inter, system-ui";
     /* arithmetic */
     var L = 34, R = half - 10, T = 18, B = h - 24; function X(p) { return L + p / pm * (R - L); } function Y(s) { return T + s / sm * (B - T); }
     x.strokeStyle = css("--line"); x.strokeRect(L, T, R - L, B - T); x.fillStyle = mut; x.textAlign = "center"; x.fillText("pressure (kPa) →", (L + R) / 2, T - 5); x.fillText("settlement (mm) ↓", (L + R) / 2, h - 6);
@@ -462,7 +483,7 @@
   function renderReport() {
     var h = '<h1>' + esc(P.name) + '</h1><div class="note">IS GeoTech ' + GC.VERSION + ' · ' + new Date().toLocaleDateString() + ' · factor of safety on shear ' + (+P.fs || 2.5) + ' · ' + esc((GC.IS1904[P.struct] || GC.IS1904.rc).name) + ' (IS 1904:2021 limits)</div>';
     P.boreholes.forEach(function (b) {
-      h += '<h2>' + esc(b.name) + ' — soil profile</h2><div class="note">Water table: ' + (isFinite(GC.gwt(b)) ? GC.gwt(b) + ' m below ground' : 'not met') + '</div><table class="mini"><tr><th>Depth (m)</th><th>Description</th><th class="n">γ</th><th class="n">c / cu</th><th class="n">φ</th><th class="n">E (MPa)</th><th class="n">Cc / e0</th></tr>' +
+      h += '<h2>' + esc(b.name) + ' — soil profile</h2><div data-fig="log_' + b.id + '"></div><div class="note">Water table: ' + (isFinite(GC.gwt(b)) ? GC.gwt(b) + ' m below ground' : 'not met') + '</div><table class="mini"><tr><th>Depth (m)</th><th>Description</th><th class="n">γ</th><th class="n">c / cu</th><th class="n">φ</th><th class="n">E (MPa)</th><th class="n">Cc / e0</th></tr>' +
         b.layers.map(function (L) { var p = GC.params(b, L); return '<tr><td>' + f1(L.top, 2) + '–' + f1(L.bot, 2) + '</td><td>' + esc(L.name || GC.KINDS[L.kind]) + '</td><td class="n">' + f1(L.gamma) + '</td><td class="n">' + (L.kind === "clay" ? f1(p.cu, 0) + (p.src.cu ? "*" : "") : f1(L.c, 0)) + '</td><td class="n">' + (L.kind === "clay" ? (L.phi ? f1(L.phi) : "—") : f1(p.phi) + (p.src.phi ? "*" : "")) + '</td><td class="n">' + f1(p.E / 1000, 1) + (p.src.E ? "*" : "") + '</td><td class="n">' + (L.Cc ? L.Cc + " / " + L.e0 : "—") + '</td></tr>'; }).join("") + '</table><div class="note">* estimated from SPT correlations.</div>';
       var sp = GC.spt(b); if (sp.length) h += '<table class="mini"><tr><th>Depth</th><th class="n">N</th><th class="n">σ′v</th><th class="n">CN</th><th class="n">N′</th><th class="n">N″</th><th class="n">φ</th></tr>' + sp.map(function (s) { return '<tr><td>' + s.z + ' m</td><td class="n">' + s.N + '</td><td class="n">' + f1(s.sv, 0) + '</td><td class="n">' + f1(s.CN, 2) + '</td><td class="n">' + f1(s.N1) + '</td><td class="n">' + f1(s.Nc) + '</td><td class="n">' + f1(s.phi) + '</td></tr>'; }).join("") + '</table>';
     });
@@ -474,15 +495,28 @@
         (a.qnet ? '<tr><td>Applied net pressure / settlement</td><td class="n">' + f1(a.qnet, 0) + ' kPa / ' + f1(st.total) + ' mm — ' + (a.ok && st.total <= a.lim.mm ? 'OK' : '<b style="color:#b42318">NOT OK</b>') + '</td></tr>' : '') + '</table>' +
         '<ol class="steps">' + a.bc.steps.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ol>' +
         '<table class="mini"><tr><th>Layer</th><th class="n">Immediate</th><th class="n">Consolidation</th><th class="n">t₉₀ (yr)</th></tr>' + st.layers.map(function (l) { return '<tr><td>' + esc(l.name) + ' (' + f1(l.top, 1) + '–' + f1(l.bot, 1) + ' m)</td><td class="n">' + f1(l.imm) + '</td><td class="n">' + (l.con ? f1(l.con) : '—') + '</td><td class="n">' + (l.t90 ? f1(l.t90, 2) : '—') + '</td></tr>'; }).join("") + '<tr><td><b>Total, mm</b></td><td></td><td></td><td class="n"><b>' + f1(st.total) + '</b></td></tr></table>' +
-        '<p><b>Which part can fail</b></p><ul>' + fl.items.map(function (i) { return '<li>' + esc(i.t) + '</li>'; }).join("") + '</ul>';
+        '<p><b>Which part can fail</b></p><ul>' + fl.items.map(function (i) { return '<li>' + esc(i.t) + '</li>'; }).join("") + '</ul><div data-fig="bulb_' + f.id + '"></div>';
     });
     (P.piles || []).forEach(function (p) { var c = GC.pileCap(P, p); if (c.err) return; var g = GC.pileGroup(P, p, c), l = GC.pileLateral(P, p), st = GC.pileSettle(P, p, +p.P || c.Qsafe, c);
       h += '<h2>' + esc(p.name) + ' — bored pile ' + p.D + ' m × ' + p.L + ' m from ' + p.Df + ' m (IS 2911 Part 1/Sec 2)</h2><table class="mini"><tr><td>Ultimate capacity (' + c.used + ')</td><td class="n">' + f1(c.Qu, 0) + ' kN</td></tr><tr><td>End bearing / shaft</td><td class="n">' + f1(c.Qb, 0) + ' / ' + f1(c.Qs, 0) + ' kN</td></tr>' + (c.Qneg ? '<tr><td>Negative skin friction (drag)</td><td class="n">' + f1(c.Qneg, 0) + ' kN</td></tr>' : '') + '<tr><td><b>Safe load per pile</b></td><td class="n"><b>' + f1(c.Qsafe, 0) + ' kN</b></td></tr><tr><td>Safe uplift</td><td class="n">' + f1(c.Qup, 0) + ' kN</td></tr><tr><td>Settlement of a single pile at ' + f1(+p.P || c.Qsafe, 0) + ' kN</td><td class="n">' + f1(st.s, 1) + ' mm</td></tr>' +
         (g.n > 1 ? '<tr><td>Group of ' + g.n + ' at ' + p.s + ' m — safe load (' + g.gov + ')</td><td class="n">' + f1(g.Qsafe, 0) + ' kN</td></tr><tr><td>Group settlement (equivalent raft)</td><td class="n">' + (g.settle ? f1(g.settle.total, 1) : '—') + ' mm</td></tr>' : '') +
-        '<tr><td>Lateral: deflection under ' + f1(+p.H, 0) + ' kN (' + p.head + ' head) / max moment</td><td class="n">' + f1(l.y0, 2) + ' mm / ' + f1(Math.max(Math.abs(l.Mmax), Math.abs(l.Mhead)), 0) + ' kN·m</td></tr><tr><td>Equivalent depth of fixity</td><td class="n">' + f1(l.zf, 2) + ' m</td></tr></table><ol class="steps">' + c.steps.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ol>'; });
+        '<tr><td>Lateral: deflection under ' + f1(+p.H, 0) + ' kN (' + p.head + ' head) / max moment</td><td class="n">' + f1(l.y0, 2) + ' mm / ' + f1(Math.max(Math.abs(l.Mmax), Math.abs(l.Mhead)), 0) + ' kN·m</td></tr><tr><td>Equivalent depth of fixity</td><td class="n">' + f1(l.zf, 2) + ' m</td></tr></table><ol class="steps">' + c.steps.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ol><div data-fig="pile_' + p.id + '"></div>'; });
     P.plates.forEach(function (p) { var o = GC.plate(p, P); if (o.err) return; h += '<h2>' + esc(p.name) + ' — plate load test (IS 1888)</h2><table class="mini"><tr><td>Plate / footing</td><td class="n">' + p.Bp + ' m / ' + p.Bf + ' m, ' + (p.soil === "clay" ? "clay" : "sand") + '</td></tr><tr><td>Ultimate (plate, log–log break)</td><td class="n">' + f1(o.qu, 0) + ' kPa</td></tr><tr><td>Pressure for ' + o.sLim + ' mm footing settlement</td><td class="n">' + f1(o.qSettle, 0) + ' kPa</td></tr><tr><td><b>Safe bearing pressure</b></td><td class="n"><b>' + f1(o.qa, 0) + ' kPa</b></td></tr></table>'; });
     h += '<p class="note">Correlations from SPT values are estimates and should be replaced by test values where available. Values from IS 1904:2021 Table 1 are guide values. The designer remains responsible for the final bearing pressure.</p>';
     $("rBody").innerHTML = h;
+    figures();
+  }
+  /* print-resolution figures (drawn off-screen at 2.5× and placed in the report) */
+  function shot(id) { try { return '<img style="width:100%;max-width:640px;border:1px solid #ddd;border-radius:8px;margin:6px 0" src="' + $(id).toDataURL("image/png") + '">'; } catch (e) { return ""; } }
+  function figures() {
+    var keep = { f: S.f, bh: S.bh }, out = {}; S.hi = 4;
+    try {
+      P.boreholes.forEach(function (b) { drawLog(b); out["log_" + b.id] = shot("logCv"); });
+      P.footings.forEach(function (f) { S.f = f.id; S.bW = null; renderBulb(); out["bulb_" + f.id] = shot("bulbCv") + shot("profCv"); });
+      (P.piles || []).forEach(function (p) { if (p.type === "ur") return; var l = GC.pileLateral(P, p); drawLat(l, p); out["pile_" + p.id] = shot("latCv"); });
+      if (window.ISGU) { ISGU.figs = out; if (ISGU.reportFigures) ISGU.reportFigures(out, shot); }
+    } finally { S.hi = false; S.f = keep.f; S.bh = keep.bh; }
+    [].forEach.call(document.querySelectorAll("#rBody [data-fig]"), function (el) { el.innerHTML = out[el.dataset.fig] || ""; });
   }
   $("rPrint").onclick = function () { if (window.AndroidBridge && AndroidBridge.print) AndroidBridge.print(P.name + " soil report"); else window.print(); };
   $("rSave").onclick = function () {
@@ -494,9 +528,14 @@
   function refresh() {
     $("pname").textContent = P.name + " · " + P.boreholes.length + " borehole" + (P.boreholes.length === 1 ? "" : "s") + " · " + P.footings.length + " footing" + (P.footings.length === 1 ? "" : "s");
     if (tab === "site") renderSite(); else if (tab === "tests") renderTests(); else if (tab === "footing") renderFooting(); else if (tab === "bulb") renderBulb(); else if (tab === "piles") renderPiles(); else if (tab === "fe") renderFE(); else if (tab === "plate") renderPlate(); else if (tab === "report") renderReport();
+    else if (window.ISGU && ISGU.tabs[tab]) ISGU.tabs[tab]();
+    if (window.ISGU && ISGU.after[tab]) ISGU.after[tab]();
   }
   var rt; window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(refresh, 150); });
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(function () {});
   window.ISG = { get P() { return P; }, S: S, show: show, refresh: refresh };
+  window.ISGU = { tabs: {}, after: {}, get P() { return P; }, S: S, cv: cv, cvS: cvS, f1: f1, bind: bind, commit: commit, changed: changed, chips: chips, esc: esc, toast: toast, css: css, download: download, safe: safe, cur: cur, KC: KC, refresh: function () { refresh(); } };
+  window.ISGX = { setProject: function (np) { P = np; S.bh = S.f = S.lab = S.pt = S.pk = S.sl = S.wl = S.rk = null; S.bW = null; S.slRes = {}; S.ffRes = null; changed(); show("site"); toast("Example opened — " + np.name); } };
   load(); refresh();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { refresh(); });
 })();
