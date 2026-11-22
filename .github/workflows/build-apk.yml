@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: '22'
       - name: Engine test
-        run: node test/core_test.js && node test/pile_test.js
+        run: node test/core_test.js && node test/pile_test.js && node test/fe_test.js
       - name: Version
         run: |
           VER=$(sed -n 's/.*C\.VERSION = "\([0-9.]*\)".*/\1/p' www/js/gcore.js | head -1)
@@ -49,7 +49,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          printf 'IS GeoTech %s (built %s, commit %s).\n\nBorehole logs and SPT corrections, soil classification (IS 1498), bearing capacity (IS 6403), settlement with time (IS 8009 Part 1), IS 1904:2021 limits, pressure bulb and weak-layer checks, plate load test (IS 1888), bored piles (IS 2911: capacity, groups, negative skin friction, lateral load, springs), printable report.\n\nAPK: install on Android. HTML: open in any browser, works offline. Web app: https://mirabidhussain.github.io/geotech-app/\n' "$VERSION_NAME" "$BUILT" "${GITHUB_SHA::7}" > notes.md
+          printf 'IS GeoTech %s (built %s, commit %s).\n\nBorehole logs and SPT corrections, soil classification (IS 1498), bearing capacity (IS 6403), settlement with time (IS 8009 Part 1), IS 1904:2021 limits, pressure bulb and weak-layer checks, plate load test (IS 1888), bored piles (IS 2911: capacity, groups, negative skin friction, lateral load, springs), 2D finite elements (slope factor of safety by strength reduction with a Bishop check, strip footing loaded to collapse), printable report.\n\nAPK: install on Android. HTML: open in any browser, works offline. Web app: https://mirabidhussain.github.io/geotech-app/\n' "$VERSION_NAME" "$BUILT" "${GITHUB_SHA::7}" > notes.md
           TAG="v$VER"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "IS-GeoTech-v$VER.apk" "IS-GeoTech-v$VER.html" --clobber

@@ -4,7 +4,7 @@
 var GC = (function () {
   "use strict";
   var C = {}, GW = 9.81, D2R = Math.PI / 180;
-  C.VERSION = "1.1";
+  C.VERSION = "1.2";
   var uidN = 0; C.uid = function () { return "g" + Date.now().toString(36) + (uidN++).toString(36); };
   function r(v, d) { var k = Math.pow(10, d === undefined ? 2 : d); return Math.round(v * k) / k; }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -14,7 +14,7 @@ var GC = (function () {
   C.KINDS = { sand: "Sand", gravel: "Gravel", silt: "Silt", clay: "Clay", rock: "Weathered rock" };
   C.blank = function (name) {
     return { app: "IS GeoTech", v: C.VERSION, name: name || "New site", fs: 2.5, struct: "rc", depthF: false, cut: 0.1,
-      boreholes: [], footings: [], plates: [], labs: [], piles: [] };
+      boreholes: [], footings: [], plates: [], labs: [], piles: [], slopes: [] };
   };
   C.layer = function (o) {
     return Object.assign({ id: C.uid(), top: 0, bot: 1, name: "", kind: "sand", gamma: 18, gsat: 19, c: 0, phi: 30, cu: 0, Dr: 0, E: 0, nu: 0.3,
@@ -30,6 +30,9 @@ var GC = (function () {
     ], spt: [{ z: 1.5, N: 9 }, { z: 3.0, N: 14 }, { z: 4.5, N: 4 }, { z: 6.0, N: 5 }, { z: 7.5, N: 32 }, { z: 9.0, N: 41 }, { z: 10.5, N: 48 }] });
     P.footings.push({ id: "f1", name: "F1 (interior column)", bh: "bh1", shape: "square", B: 2.0, L: 2.0, Df: 1.5, P: 900, H: 0, eB: 0, eL: 0, x: 0, y: 0 });
     P.piles.push({ id: "pl1", name: "P1 (2 × 2 group under C4)", bh: "bh1", D: 0.5, L: 12, Df: 1.5, fck: 25, P: 600, H: 30, M: 0, e: 0, head: "fixed", K: 1.0, Nq: "", method: "lower", nsf: [], nx: 2, ny: 2, s: 1.5 });
+    P.slopes.push({ id: "s1", name: "River bund, 1.5:1", H: 6, beta: 33.7, toe: 8, crest: 10, depth: 5, water: 2, q: 10, layers: [
+      { name: "Compacted silty fill", bot: 0, c: 8, phi: 27, gamma: 18, gsat: 19, E: 15000, nu: 0.3 },
+      { name: "Soft silty clay (drained)", bot: -1e9, c: 4, phi: 22, gamma: 17.5, gsat: 17.5, E: 8000, nu: 0.35 }] });
     P.plates.push({ id: "p1", name: "PLT-1 at 1.5 m", Bp: 0.3, Bf: 2.0, soil: "sand", rows: [[0, 0], [50, 1.1], [100, 2.4], [150, 3.9], [200, 5.8], [250, 8.3], [300, 12.0], [350, 17.5], [400, 25.5]] });
     P.labs.push({ id: "l1", name: "BH-1 @ 2.0 m", sieve: [[4.75, 0], [2.0, 18], [0.425, 112], [0.075, 205]], total: 500, LL: 0, PL: 0, organic: false });
     return P;

@@ -17,6 +17,7 @@ jobs:
           node-version: '22'
       - run: node test/core_test.js
       - run: node test/pile_test.js
+      - run: node test/fe_test.js
 
   ui:
     name: Browser test

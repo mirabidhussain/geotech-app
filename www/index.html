@@ -82,7 +82,7 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
 </div>
 <input type="file" id="fOpen" accept=".json,application/json,text/plain,*/*" hidden>
 <nav class="tabs" id="tabs">
-  <button data-t="site" class="on">Site</button><button data-t="tests">Lab tests</button><button data-t="footing">Footing</button><button data-t="bulb">Pressure bulb</button><button data-t="piles">Piles</button><button data-t="plate">Plate test</button><button data-t="report">Report</button>
+  <button data-t="site" class="on">Site</button><button data-t="tests">Lab tests</button><button data-t="footing">Footing</button><button data-t="bulb">Pressure bulb</button><button data-t="piles">Piles</button><button data-t="fe">2D FE</button><button data-t="plate">Plate test</button><button data-t="report">Report</button>
 </nav>
 <main>
 <section id="site" class="on">
@@ -220,6 +220,45 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
   <div class="card"><h3>Springs for IS StructDesign</h3><div id="kSpr"></div><div class="btns"><button class="btn" id="kCsv">Save springs (.csv)</button></div></div>
 </section>
 
+<section id="fe">
+  <div class="chips" id="feMode"><button class="chip on" data-m="slope">Slope stability</button><button class="chip" data-m="foot">Footing to collapse</button></div>
+  <div id="feSlope">
+    <div class="chips" id="slChips"></div>
+    <div class="card">
+      <h3>Slope — plane strain</h3>
+      <label class="f"><span>Name</span><input id="slName"></label>
+      <div class="row3">
+        <label class="f"><span>Height H (m)</span><input id="slH" type="number" step="0.5"></label>
+        <label class="f"><span>Slope angle β (°)</span><input id="slB" type="number" step="0.5"></label>
+        <label class="f"><span>Foundation depth below toe (m)</span><input id="slD" type="number" step="0.5"></label>
+      </div>
+      <div class="row3">
+        <label class="f"><span>Ground ahead of the toe (m)</span><input id="slT" type="number" step="0.5"></label>
+        <label class="f"><span>Crest width modelled (m)</span><input id="slC" type="number" step="0.5"></label>
+        <label class="f"><span>Crest surcharge (kPa)</span><input id="slQ" type="number"></label>
+      </div>
+      <label class="f"><span>Water level, height above the toe (m) — blank if none</span><input id="slW" type="number" step="0.5"></label>
+      <div class="note">Layers from the top down; each ends at the elevation given (toe = 0, crest = H). The last layer continues to the base. Use c′, φ′ for long-term (drained) checks, or cu with φ = 0 for short-term clay.</div>
+      <table class="mini" id="slLay"></table>
+      <div class="btns"><button class="btn" id="slAddL">Add layer</button><select id="slFrom" class="btn" style="max-width:220px"></select></div>
+      <div class="btns"><button class="btn pri" id="slRun">Find the factor of safety</button><button class="btn" id="slNew">New slope</button><button class="btn dan" id="slDel">Delete slope</button></div>
+      <div class="note" id="slProg"></div>
+    </div>
+    <div class="card"><h3>Result</h3><div id="slRes"><div class="note">Press "Find the factor of safety". The finite-element check divides c′ and tan φ′ by a factor until the slope can no longer stand (strength reduction); Bishop's simplified method searches slip circles as an independent check.</div></div>
+      <div class="cvw" style="margin-top:8px"><canvas id="slCv"></canvas></div>
+      <div class="leg"><span><i style="background:#ea580c"></i>Plastic shear strain at failure (the slip band)</span><span><i style="background:var(--err)"></i>Bishop critical circle</span><span><i style="background:var(--blue)"></i>Water level</span></div></div>
+  </div>
+  <div id="feFoot" style="display:none">
+    <div class="card">
+      <h3>Strip footing loaded to collapse</h3>
+      <div class="row"><label class="f"><span>Footing (from the Footing tab)</span><select id="ffF"></select></label><label class="f"><span>Soil strength</span><select id="ffMode"><option value="drained">Drained c′, φ′</option><option value="undrained">Undrained cu (clay layers)</option></select></label></div>
+      <div class="note">The footing's width and depth are used as a strip (plane strain), half model by symmetry, soil layers from its borehole. Pressure is raised step by step until the soil can no longer carry it.</div>
+      <div class="btns"><button class="btn pri" id="ffRun">Load to collapse</button></div><div class="note" id="ffProg"></div>
+    </div>
+    <div class="card"><h3>Result</h3><div id="ffRes"></div><div class="cvw"><canvas id="ffCv"></canvas></div><div class="cvw" style="margin-top:8px"><canvas id="ffMesh"></canvas></div></div>
+  </div>
+</section>
+
 <section id="plate">
   <div class="chips" id="pChips"></div>
   <div class="card">
@@ -245,6 +284,7 @@ details summary{cursor:pointer;font-weight:600;padding:4px 0}
 <div class="toast" id="toast"></div>
 <script src="js/gcore.js"></script>
 <script src="js/gpile.js"></script>
+<script src="js/gfe.js"></script>
 <script src="js/gui.js"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 A companion app to [IS StructDesign](https://github.com/mirabidhussain/structural-analysis-and-design-app) for soil and shallow foundations.
 
-**Web app:** https://mirabidhussain.github.io/geotech-app/ (works offline once opened) · **Android:** download the APK from [Releases](https://github.com/mirabidhussain/geotech-app/releases). Version 1.1 adds bored piles (phase 2 of the geotechnical plan).
+**Web app:** https://mirabidhussain.github.io/geotech-app/ (works offline once opened) · **Android:** download the APK from [Releases](https://github.com/mirabidhussain/geotech-app/releases). Version 1.2 adds 2D finite elements (phase 4); version 1.1 added bored piles (phase 2).
 
 ## What it does
 
@@ -49,6 +49,9 @@ A companion app to [IS StructDesign](https://github.com/mirabidhussain/structura
   - lateral load on a Winkler beam with IS 2911 Annex C subgrade values (Tables 3 and 4), free or fixed head, deflection and moment profiles, equivalent depth of fixity for frame models, lateral load for 5 mm / ½ of 12 mm;
   - spring table for IS StructDesign (.csv).
 - **Footings** also report the modulus of subgrade reaction ks = q/s for raft models.
+- **2D finite elements** (plane strain, 8-node elements, elastic–perfectly plastic Mohr–Coulomb, viscoplastic solution after Smith & Griffiths):
+  - **Slope stability:** factor of safety by strength reduction (Griffiths & Lane 1999) with the plastic slip band drawn, and Bishop's simplified method with a circle search as an independent check; layers, crest surcharge, a horizontal water level (buoyant weight; no seepage), layers can be filled from a borehole (drained or undrained);
+  - **Strip footing to collapse:** the footing's width and depth on its borehole, drained or undrained, load–settlement curve to failure and the plastic zone, compared with IS 6403 — this shows failures that reach a weaker layer below the zone the formula uses.
 - **Plate load test** (IS 1888):
   - log–log break for the ultimate pressure;
   - scaling to the footing size (Terzaghi and Peck for sand, B ratio for clay);
@@ -60,6 +63,7 @@ A companion app to [IS StructDesign](https://github.com/mirabidhussain/structura
 ```
 node test/core_test.js   # IS 6403 Table 1, Fadum/Boussinesq, Steinbrenner, consolidation, IS 1498, plate test
 node test/pile_test.js   # IS 2911 Annex B hand calculations, Hetényi and Reese–Matlock lateral solutions, groups
+node test/fe_test.js     # Prandtl, Griffiths & Lane example 1, Taylor vertical cut, submerged infinite slope, Bishop cross-checks
 python3 build.py && node test/ui_test.js
 ```
 

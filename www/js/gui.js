@@ -17,7 +17,7 @@
   function changed() { persist(); refresh(); }
   $("bUndo").onclick = function () { if (!S.undo.length) return toast("Nothing to undo"); P = JSON.parse(S.undo.pop()); changed(); };
   function cur(list, id) { return list.filter(function (x) { return x.id === id; })[0] || list[0] || null; }
-  function bh() { return cur(P.boreholes, S.bh); } function ft() { return cur(P.footings, S.f); } function lab() { return cur(P.labs, S.lab); } function pt() { return cur(P.plates, S.pt); } function pk() { return cur(P.piles || (P.piles = []), S.pk); }
+  function bh() { return cur(P.boreholes, S.bh); } function ft() { return cur(P.footings, S.f); } function lab() { return cur(P.labs, S.lab); } function pt() { return cur(P.plates, S.pt); } function pk() { return cur(P.piles || (P.piles = []), S.pk); } function sl() { return cur(P.slopes || (P.slopes = []), S.sl); }
 
   /* ---------------- files ---------------- */
   var DL = null; try { if (window.claude && window.claude.use) window.claude.use("downloads").then(function (d) { DL = d; }, function () {}); } catch (e) {}
@@ -46,7 +46,7 @@
     else if (m === "save") download(safe(P.name) + ".isg.json", GC.save(P), "application/json");
     else if (m === "report") show("report");
     else if (m === "theme") { var th = document.documentElement.dataset.th === "dark" ? "" : "dark"; document.documentElement.dataset.th = th; try { localStorage.setItem(THK, th); } catch (er) {} refresh(); }
-    else if (m === "about") alert("IS GeoTech " + GC.VERSION + "\\nShallow foundations from borehole data: SPT corrections, soil classification (IS 1498), bearing capacity (IS 6403), settlement (IS 8009 Part 1), limits (IS 1904:2021), plate load test (IS 1888), pressure bulb and weak-layer checks, bored piles (IS 2911: capacity, groups, negative skin friction, lateral load, springs).\\n\\nCorrelations from SPT are estimates; replace them with test values where you have them. Check results before use in design.".replace(/\\n/g, "\n"));
+    else if (m === "about") alert("IS GeoTech " + GC.VERSION + "\\nShallow foundations from borehole data: SPT corrections, soil classification (IS 1498), bearing capacity (IS 6403), settlement (IS 8009 Part 1), limits (IS 1904:2021), plate load test (IS 1888), pressure bulb and weak-layer checks, bored piles (IS 2911: capacity, groups, negative skin friction, lateral load, springs), 2D finite elements (slope factor of safety by strength reduction with a Bishop check, strip footing to collapse).\\n\\nCorrelations from SPT are estimates; replace them with test values where you have them. Check results before use in design.".replace(/\\n/g, "\n"));
   };
 
   /* ---------------- generic binding ---------------- */
@@ -66,7 +66,7 @@
   var FIELDS = {
     all: [["bot", "Bottom (m)"], ["gamma", "γ bulk (kN/m³)"], ["gsat", "γ sat (kN/m³)"], ["E", "E (kPa)"], ["nu", "Poisson ν"]],
     gran: [["phi", "φ (°)"], ["c", "c (kPa)"], ["Dr", "Dr (%)"]],
-    clay: [["cu", "cu (kPa)"], ["phi", "φ′ drained (°)"], ["c", "c′ (kPa)"], ["Cc", "Cc"], ["Cr", "Cr"], ["e0", "e0"], ["pc", "σ′p (kPa)"], ["cv", "cv (m²/yr)"], ["mv", "mv (m²/MN)"]]
+    clay: [["cu", "cu (kPa)"], ["phi", "φ′ drained (°)"], ["c", "c′ (kPa)"], ["Cc", "Cc"], ["Cr", "Cr"], ["e0", "e0"], ["pc", "σ′p (kPa)"], ["cv", "cv (m²/yr)"], ["mv", "mv (m²/MN)"], ["alpha", "Pile α (IS 2911 Fig. 2)"]]
   };
   function renderSite() {
     $("pName").value = P.name; bind("pName", P, "name"); bind("pFs", P, "fs", true); bind("pDepth", P, "depthF");
@@ -303,6 +303,121 @@
     x.fillStyle = mut; x.textAlign = "right"; var stp = zt > 20 ? 5 : zt > 8 ? 2 : 1; for (var z = 0; z <= zt; z += stp) x.fillText(z + " m", 28, Y(z) + 4);
   }
 
+
+  /* ---------------- 2D finite elements ---------------- */
+  S.feMode = "slope"; S.slRes = {}; S.ffRes = null;
+  $("feMode").onclick = function (e) { var b = e.target.closest("button"); if (!b) return; S.feMode = b.dataset.m; renderFE(); };
+  function renderFE() {
+    [].forEach.call($("feMode").children, function (b) { b.classList.toggle("on", b.dataset.m === S.feMode); });
+    $("feSlope").style.display = S.feMode === "slope" ? "" : "none"; $("feFoot").style.display = S.feMode === "foot" ? "" : "none";
+    if (S.feMode === "slope") renderSlope(); else renderFF();
+  }
+  function renderSlope() {
+    var s = sl(); chips("slChips", P.slopes, s && s.id, function (id) { S.sl = id; });
+    if (!s) { $("slRes").innerHTML = '<div class="note">No slope yet — add one.</div>'; $("slLay").innerHTML = ""; return; }
+    S.sl = s.id; bind("slName", s, "name");
+    ["slH:H", "slB:beta", "slD:depth", "slT:toe", "slC:crest", "slQ:q", "slW:water"].forEach(function (q) { var a = q.split(":"); bind(a[0], s, a[1], true, function () { delete S.slRes[s.id]; }); });
+    $("slLay").innerHTML = '<tr><td style="padding:0">' + s.layers.map(function (L, i) { var last = i === s.layers.length - 1;
+      return '<div class="lay open" style="margin:6px 0"><div class="b" style="display:block;border:0;padding:8px 10px"><div class="row"><label class="f"><span>Layer ' + (i + 1) + '</span><input data-i="' + i + '" data-k="name" value="' + esc(L.name) + '"></label><label class="f"><span>Ends at elevation (m)</span>' + (last ? '<input disabled value="base of model">' : '<input type="number" step="0.5" data-i="' + i + '" data-k="bot" value="' + L.bot + '">') + '</label></div><div class="grid4">' +
+        [["c", "c (kPa)"], ["phi", "φ (°)"], ["gamma", "γ (kN/m³)"], ["gsat", "γsat"], ["E", "E (kPa)"], ["nu", "ν"]].map(function (q) { return '<label class="f"><span>' + q[1] + '</span><input type="number" step="any" data-i="' + i + '" data-k="' + q[0] + '" value="' + (L[q[0]] === undefined ? "" : L[q[0]]) + '"></label>'; }).join("") +
+        (s.layers.length > 1 ? '<label class="f"><span>&nbsp;</span><button class="btn dan" data-x="' + i + '">Remove</button></label>' : '') + '</div></div></div>'; }).join("") + '</td></tr>';
+    $("slFrom").innerHTML = '<option value="">Fill layers from a borehole…</option>' + P.boreholes.map(function (b) { return '<option value="' + b.id + '|drained">' + esc(b.name) + ' — drained c′, φ′</option><option value="' + b.id + '|undrained">' + esc(b.name) + ' — undrained cu for clay</option>'; }).join("");
+    var r = S.slRes[s.id];
+    if (r) {
+      var need = 1.5, ok = r.fos && r.fos >= need;
+      $("slRes").innerHTML = '<div class="stat"><div><small>Factor of safety — finite elements (strength reduction)</small><b class="big">' + (r.fos ? f1(r.fos, 2) : "—") + '</b>' + (r.note ? '<div class="note">' + esc(r.note) + '</div>' : '') + '</div><div><small>Factor of safety — Bishop simplified (critical circle)</small><b class="big">' + (r.bi ? f1(r.bi.F, 2) : "—") + '</b></div></div>' +
+        (r.fos ? '<div class="verdict ' + (ok ? "ok" : "err") + '">' + (ok ? "Stable with the usual margin (FoS ≥ " + need + " for long-term static conditions)." : r.fos >= 1 ? "Stands, but below the usual FoS of " + need + "." : "Not stable — the slope fails with these strengths.") + '</div>' : '') +
+        '<div class="note">' + r.trials + ' trial analyses, ' + r.ne + ' elements, ' + f1(r.time, 1) + ' s. The two methods normally agree within a few per cent; a large gap usually means a weak layer that circles cannot follow — the FE slip band shows the actual mechanism. The water level is taken as horizontal (no seepage); for steady seepage through a bund the factor of safety will be lower.</div>';
+      drawFE("slCv", r.md.mesh, r.md.M, r.gp, s, r.bi, null);
+    } else { var c = cv("slCv", 0.6, 220); drawSlopeGeom(c, s); }
+  }
+  $("slLay").onchange = function (e) { var el = e.target, s = sl(); if (el.dataset.i === undefined) return; commit(); var L = s.layers[+el.dataset.i]; L[el.dataset.k] = el.dataset.k === "name" ? el.value : +el.value; delete S.slRes[s.id]; changed(); };
+  $("slLay").onclick = function (e) { var d = e.target.closest("[data-x]"); if (!d) return; var s = sl(); commit(); s.layers.splice(+d.dataset.x, 1); delete S.slRes[s.id]; changed(); };
+  $("slAddL").onclick = function () { var s = sl(); if (!s) return; commit(); var last = s.layers[s.layers.length - 1], nb = s.layers.length > 1 ? s.layers[s.layers.length - 2].bot - 2 : 0; s.layers.splice(s.layers.length - 1, 0, Object.assign({}, last, { name: "Layer " + (s.layers.length + 1), bot: nb })); delete S.slRes[s.id]; changed(); };
+  $("slFrom").onchange = function () { var v = this.value; if (!v) return; var s = sl(); commit(); var a = v.split("|"); s.layers = GC.slopeFromBorehole(P, a[0], s, a[1]).map(function (L) { L.bot = isFinite(L.bot) ? r(L.bot, 2) : -1e9; return L; }); delete S.slRes[s.id]; changed(); toast("Layers taken from the borehole, depths measured from the crest"); };
+  $("slNew").onclick = function () { commit(); var s = { id: GC.uid(), name: "Slope " + (P.slopes.length + 1), H: 6, beta: 33.7, toe: 8, crest: 10, depth: 4, water: "", q: 0, layers: [{ name: "Soil", bot: -1e9, c: 10, phi: 28, gamma: 18, gsat: 19, E: 20000, nu: 0.3 }] }; P.slopes.push(s); S.sl = s.id; changed(); };
+  $("slDel").onclick = function () { var s = sl(); if (!s) return; commit(); P.slopes = P.slopes.filter(function (x) { return x !== s; }); S.sl = null; changed(); };
+  $("slRun").onclick = function () {
+    var s = sl(); if (!s) return; var btn = this; btn.disabled = true;
+    var t0 = Date.now(), inp = JSON.parse(JSON.stringify(s)); inp.layers.forEach(function (L) { L.psi = 0; L.nu = L.nu || 0.3; if (L.bot <= -1e8) L.bot = -1e9; });
+    if (inp.water === "" || inp.water === undefined) inp.water = null;
+    $("slProg").textContent = "Building the mesh…";
+    setTimeout(function () {
+      var md, bi; try { md = GC.slopeModel(inp, {}); bi = GC.bishop(inp); } catch (er) { $("slProg").textContent = "Error: " + er.message; btn.disabled = false; return; }
+      var lo = 0.3, hi = 4, last = null, n = 0, fos = null, note = "", stage = 0;
+      function done() { var u = last ? last.u : null; S.slRes[s.id] = { fos: fos, note: note, bi: bi, md: md, gp: GC.plasticByElement(md.M), u: u, trials: n, ne: md.M.E.length, time: (Date.now() - t0) / 1000 }; $("slProg").textContent = ""; btn.disabled = false; renderSlope(); }
+      function next() {
+        var srf = stage === 0 ? lo : stage === 1 ? hi : (lo + hi) / 2;
+        $("slProg").textContent = "Trial " + (n + 1) + ": strengths ÷ " + f1(srf, 3) + (stage > 1 ? " — FoS between " + f1(lo, 2) + " and " + f1(hi, 2) : "") + "…";
+        setTimeout(function () {
+          var rr = GC.ssrTrial(md, srf); n++;
+          if (stage === 0) { if (!rr.conv) { fos = null; note = "Fails even with strengths divided by 0.3"; last = rr; return done(); } stage = 1; return next(); }
+          if (stage === 1) { if (rr.conv) { fos = hi; note = "Stable with strengths divided by 4 — FoS at least 4"; last = rr; return done(); } last = rr; stage = 2; return next(); }
+          if (rr.conv) lo = srf; else { hi = srf; last = rr; }
+          if (hi - lo <= 0.01) { fos = (lo + hi) / 2; if (!last || last.srf !== hi) last = GC.ssrTrial(md, hi); return done(); }
+          next();
+        }, 20);
+      }
+      next();
+    }, 30);
+  };
+  function drawSlopeGeom(c, s) {
+    var g = GC.slopeProfile(s), x = c.x, W = g.x3, Hh = s.H + (+s.depth || 0), sc = Math.min((c.w - 20) / W, (c.h - 20) / Hh), ox = 10, oy = 10 + s.H * sc;
+    function X(v) { return ox + v * sc; } function Y(v) { return oy - v * sc; }
+    s.layers.forEach(function (L, i) { var top = i ? s.layers[i - 1].bot : s.H, bot = Math.max(L.bot, -(+s.depth || 0)); x.fillStyle = ["#e2c47a", "#8ea6b4", "#c49a5c", "#c9b899"][i % 4]; x.globalAlpha = 0.5; x.fillRect(X(0), Y(Math.min(top, s.H)), W * sc, (Math.min(top, s.H) - bot) * sc); x.globalAlpha = 1; });
+    x.fillStyle = css("--cv") || "#fff"; x.beginPath(); x.moveTo(X(g.x1), Y(0)); x.lineTo(X(g.x2), Y(s.H)); x.lineTo(X(g.x1 - 1), Y(s.H + 1)); x.lineTo(X(g.x1), Y(s.H + 1)); x.lineTo(X(0), Y(s.H + 1)); x.lineTo(X(0), Y(0)); x.closePath(); x.fill();
+    x.strokeStyle = css("--ink"); x.lineWidth = 1.5; x.beginPath(); x.moveTo(X(0), Y(0)); x.lineTo(X(g.x1), Y(0)); x.lineTo(X(g.x2), Y(s.H)); x.lineTo(X(g.x3), Y(s.H)); x.stroke(); x.lineWidth = 1;
+    if (s.water !== "" && s.water !== null && s.water !== undefined) { x.strokeStyle = css("--blue"); x.setLineDash([6, 4]); x.beginPath(); x.moveTo(X(0), Y(+s.water)); x.lineTo(X(W), Y(+s.water)); x.stroke(); x.setLineDash([]); }
+    return { X: X, Y: Y, sc: sc };
+  }
+  function drawFE(id, mesh, M, gp, s, bi, u) {
+    var c = cv(id, s ? 0.6 : 0.6, 230), x = c.x, xs = mesh.X, ys = mesh.Y, x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var sc = Math.min((c.w - 20) / (x1 - x0), (c.h - 20) / (y1 - y0)), ox = 10 + ((c.w - 20) - (x1 - x0) * sc) / 2;
+    function X(v) { return ox + (v - x0) * sc; } function Y(v) { return 10 + (y1 - v) * sc; }
+    var gmax = Math.max.apply(null, gp) || 1, cols = ["#e2c47a", "#8ea6b4", "#c49a5c", "#c9b899"], o = [0, 2, 4, 6];
+    M.E.forEach(function (e, i) { x.beginPath(); o.forEach(function (k, j) { var n = e.n[k]; if (j) x.lineTo(X(xs[n]), Y(ys[n])); else x.moveTo(X(xs[n]), Y(ys[n])); }); x.closePath();
+      x.fillStyle = cols[e.mi % 4]; x.globalAlpha = 0.45; x.fill(); x.globalAlpha = 1;
+      var t = gp[i] / gmax; if (t > 0.04) { x.fillStyle = "rgba(234,88,12," + Math.min(0.95, 0.15 + t) + ")"; x.fill(); }
+      x.strokeStyle = "rgba(120,120,120,.25)"; x.stroke(); });
+    if (s && s.water !== "" && s.water !== null && s.water !== undefined) { x.strokeStyle = css("--blue"); x.setLineDash([6, 4]); x.beginPath(); x.moveTo(X(x0), Y(+s.water)); x.lineTo(X(x1), Y(+s.water)); x.stroke(); x.setLineDash([]); }
+    if (bi) { x.strokeStyle = css("--err"); x.lineWidth = 2; x.setLineDash([6, 4]); x.beginPath(); var first = true; for (var k = 0; k <= 60; k++) { var xx = bi.xa + (bi.xb - bi.xa) * k / 60, d = bi.R * bi.R - (xx - bi.xc) * (xx - bi.xc); if (d < 0) continue; var yy = bi.yc - Math.sqrt(d); if (first) { x.moveTo(X(xx), Y(yy)); first = false; } else x.lineTo(X(xx), Y(yy)); } x.stroke(); x.setLineDash([]); x.lineWidth = 1; }
+    if (u) { /* movement of the failing mass: arrows at element centres where the displacement is large */ var um = 0; for (var n = 0; n < xs.length; n++) um = Math.max(um, Math.hypot(u[2 * n], u[2 * n + 1]));
+      if (um > 0) { x.strokeStyle = css("--ink"); x.fillStyle = css("--ink"); M.E.forEach(function (e, i) { if (i % 3) return; var n = e.n[4], dx = u[2 * n] / um, dy = u[2 * n + 1] / um, L = Math.hypot(dx, dy); if (L < 0.5) return; var px = X(e.xc), py = Y(e.yc), ex = px + dx * 12, ey = py - dy * 12; x.beginPath(); x.moveTo(px, py); x.lineTo(ex, ey); x.stroke(); x.beginPath(); x.arc(ex, ey, 1.6, 0, 7); x.fill(); }); } }
+  }
+  function renderFF() {
+    var opts = P.footings.map(function (f) { return '<option value="' + f.id + '">' + esc(f.name) + ' — ' + f.B + ' m at ' + f.Df + ' m</option>'; }).join("");
+    if ($("ffF").innerHTML !== opts) $("ffF").innerHTML = opts; if (S.ffF) $("ffF").value = S.ffF;
+    var r = S.ffRes; if (!r) { $("ffRes").innerHTML = '<div class="note">Choose a footing and press "Load to collapse".</div>'; return; }
+    $("ffRes").innerHTML = '<div class="stat"><div><small>Collapse pressure — finite elements (net)</small><b class="big">' + f1(r.qu, 0) + '</b> kPa</div><div><small>IS 6403 net ultimate for the same strip</small><b class="big">' + f1(r.is, 0) + '</b> kPa</div></div><div class="note">' + esc(r.note) + ' ' + r.steps + ' load steps, ' + f1(r.time, 1) + ' s.</div>' +
+      (r.qu < 0.75 * r.is ? '<div class="verdict err">The finite-element collapse pressure is much lower than the IS 6403 formula. The IS formula uses only the soil within about B below the base; the plastic zone below shows the failure reaching a weaker layer deeper down. Use the lower value, and see "Which part can fail" on the Footing tab.</div>' : r.qu > 1.3 * r.is ? '<div class="note">The finite-element value is higher than IS 6403; the IS formula is the safer basis.</div>' : '<div class="verdict ok">The two agree reasonably — the bearing stratum governs.</div>');
+    var c = cv("ffCv", 0.55, 200), x = c.x, w = c.w, h = c.h, L = 44, R = w - 12, T = 16, B = h - 26, cu = r.curve, qm = Math.max(r.qu, r.is) * 1.1, sm = cu[cu.length - 1].s * 1.1 || 1;
+    function X(q) { return L + q / qm * (R - L); } function Y(s) { return T + s / sm * (B - T); }
+    x.strokeStyle = css("--line"); x.strokeRect(L, T, R - L, B - T); x.fillStyle = css("--mut"); x.font = "11px system-ui"; x.textAlign = "center"; x.fillText("net pressure (kPa) →  " + f1(qm, 0), (L + R) / 2, h - 8); x.textAlign = "right"; x.fillText(f1(sm, 0) + " mm", L - 3, B);
+    x.strokeStyle = css("--blue"); x.lineWidth = 2; x.beginPath(); cu.forEach(function (p, i) { if (i) x.lineTo(X(p.q), Y(p.s)); else x.moveTo(X(p.q), Y(p.s)); }); x.stroke(); x.lineWidth = 1;
+    x.strokeStyle = css("--acc"); x.setLineDash([5, 4]); x.beginPath(); x.moveTo(X(r.is), T); x.lineTo(X(r.is), B); x.stroke(); x.setLineDash([]); x.fillStyle = css("--acc"); x.textAlign = "right"; x.fillText("IS 6403", X(r.is) - 3, T + 12);
+    drawFE("ffMesh", r.mesh, r.M, r.gp, null, null, null);
+  }
+  $("ffF").onchange = function () { S.ffF = this.value; };
+  $("ffRun").onclick = function () {
+    var f = cur(P.footings, $("ffF").value); if (!f) return toast("Add a footing first"); S.ffF = f.id;
+    var b = GC.bh(P, f.bh), und = $("ffMode").value === "undrained", Df = +f.Df, btn = this, t0 = Date.now();
+    var layers = b.layers.filter(function (L) { return L.bot > Df; }).map(function (L) { var p = GC.params(b, L), u = und && L.kind === "clay"; return { bot: L.bot - Df, c: u ? (p.cu || 0) : (+L.c || 0), phi: u ? 0 : (L.kind === "clay" ? (+L.phi || 0) : (p.phi || 30)), psi: 0, gamma: L.gamma, gsat: L.gsat || L.gamma, E: p.E || 20000, nu: u ? 0.49 : Math.min(p.nu || 0.3, 0.45) }; });
+    if (!layers.length) return toast("The footing is below the borehole log");
+    if (layers.some(function (L) { return L.c <= 0 && L.phi <= 0; })) return toast("A layer has neither strength c nor φ — check the Site tab");
+    var gw = GC.gwt(b), q0 = GC.sv(b, Df).t - (isFinite(gw) ? Math.max(0, Df - gw) * 9.81 : 0);
+    var fs = Object.assign({}, f, { shape: "strip", P: 0, H: 0, eB: 0, eL: 0 }), Pc = JSON.parse(JSON.stringify(P));
+    if (und) Pc.boreholes.forEach(function (bb) { bb.layers.forEach(function (L) { if (L.kind === "clay") L.phi = 0; }); });
+    var isq = GC.bearing(Pc, fs).qnu, st = GC.footingStart({ B: +f.B, q0: GC.sv(b, Df).e, layers: layers, water: isFinite(gw) ? Math.max(0, gw - Df) : null }, { dq: Math.max(5, isq / 12), dqMin: Math.max(0.5, isq / 400), limit: 600 });
+    btn.disabled = true;
+    (function loop() {
+      for (var k = 0; k < 1 && !st.done; k++) GC.footingStep(st);
+      $("ffProg").textContent = "Pressure " + f1(st.q, 0) + " kPa, settlement " + f1(st.curve[st.curve.length - 1].s, 1) + " mm…";
+      if (!st.done) return setTimeout(loop, 10);
+      S.ffRes = { qu: st.q, curve: st.curve, M: st.M, mesh: st.mesh, gp: st.gp, u: st.u, is: isq, steps: st.n, time: (Date.now() - t0) / 1000, note: und ? "Undrained: clay layers with cu and φ = 0." : "Drained: c′ and φ′ (non-associated flow, ψ = 0, which gives somewhat lower collapse loads than the IS 6403 factors for φ′ above about 30°)." };
+      $("ffProg").textContent = ""; btn.disabled = false; renderFF();
+    })();
+  };
+
   /* ---------------- plate load test ---------------- */
   function renderPlate() {
     var p = pt(); chips("pChips", P.plates, p && p.id, function (id) { S.pt = id; });
@@ -378,7 +493,7 @@
   /* ---------------- refresh ---------------- */
   function refresh() {
     $("pname").textContent = P.name + " · " + P.boreholes.length + " borehole" + (P.boreholes.length === 1 ? "" : "s") + " · " + P.footings.length + " footing" + (P.footings.length === 1 ? "" : "s");
-    if (tab === "site") renderSite(); else if (tab === "tests") renderTests(); else if (tab === "footing") renderFooting(); else if (tab === "bulb") renderBulb(); else if (tab === "piles") renderPiles(); else if (tab === "plate") renderPlate(); else if (tab === "report") renderReport();
+    if (tab === "site") renderSite(); else if (tab === "tests") renderTests(); else if (tab === "footing") renderFooting(); else if (tab === "bulb") renderBulb(); else if (tab === "piles") renderPiles(); else if (tab === "fe") renderFE(); else if (tab === "plate") renderPlate(); else if (tab === "report") renderReport();
   }
   var rt; window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(refresh, 150); });
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(function () {});

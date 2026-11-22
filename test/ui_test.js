@@ -1,7 +1,7 @@
 /* IS GeoTech browser test (Playwright): every tab renders, edits flow through, numbers agree with the engine */
 const { chromium } = require('playwright');
 const path = require('path');
-global.GC = require('../www/js/gcore.js'); require('../www/js/gpile.js'); const GC = global.GC;
+global.GC = require('../www/js/gcore.js'); require('../www/js/gpile.js'); require('../www/js/gfe.js'); const GC = global.GC;
 let pass = 0, fail = 0;
 function ok(n, c, info) { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL ') + n + (!c && info !== undefined ? ' — ' + info : '')); }
 (async () => {
@@ -52,6 +52,16 @@ function ok(n, c, info) { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL 
     ok('Springs saved as .csv', /_springs\.csv$/.test(dls.suggestedFilename()));
     await pg.click('[data-t=footing]'); await pg.waitForTimeout(150);
     ok('Footing shows the modulus of subgrade reaction', /Modulus of subgrade reaction/.test(await pg.textContent('#fRes'))); }
+  /* 2D FE: slope and footing */
+  await pg.click('[data-t=fe]'); await pg.waitForTimeout(150);
+  await pg.click('#slRun'); await pg.waitForFunction(() => /Factor of safety — finite elements/.test(document.getElementById('slRes').textContent), null, { timeout: 240000 });
+  { const t = await pg.textContent('#slRes'), m = t.match(/strength reduction\)([\d.]+)/), b = t.match(/critical circle\)([\d.]+)/);
+    ok('Slope: FE and Bishop factors of safety shown and within 10 %', m && b && Math.abs(+m[1] - +b[1]) / +b[1] < 0.1, t.slice(0, 200));
+    const px = await pg.evaluate(() => { const c = document.getElementById('slCv'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 60 && d[i + 1] < 140 && d[i + 2] < 60) n++; return n; });
+    ok('Slip band drawn in orange', px > 200, px); }
+  await pg.click('#feMode [data-m=foot]'); await pg.selectOption('#ffMode', 'undrained'); await pg.click('#ffRun');
+  await pg.waitForFunction(() => /Collapse pressure/.test(document.getElementById('ffRes').textContent), null, { timeout: 240000 });
+  ok('Footing loaded to collapse: FE and IS 6403 values shown', /IS 6403 net ultimate/.test(await pg.textContent('#ffRes')));
   /* plate */
   await pg.click('[data-t=plate]'); await pg.waitForTimeout(100);
   const pt = await pg.textContent('#ptOut'), po = GC.plate(P.plates[0], P);
